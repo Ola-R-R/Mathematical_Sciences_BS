@@ -1,0 +1,285 @@
+---
+subtitle: "CI"
+title: "Compulsory exercise 3"
+author: "Martinius T. Singdahlsen"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document
+  #pdf_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=FALSE, size="scriptsize",fig.width=4, fig.height=3,fig.align = "center")
+
+source("probAhelp.R")
+source("probAdata.R")
+```
+
+# Problem A
+
+We will examine to different parameter estimations for a non Gaussian time series of length $T=100$ fitted with the AR(2) model. The AR(2) model is given by,
+
+$$
+  x_t=\beta_1x_{t-1}+\beta_2x_{t-2}+e_{t},
+$$
+
+where $e_t$ are all iid with constant variance and zero mean. There are multiple methods of obtaining the parameters in an AR(n) model. We will focus on the least sum of squares (denoted LS) and least sum of absolute value (denoted LA), and compare them to each other. They are given by,
+
+$$
+  Q_{LS} & \sum_{t=3}^{T}(x_t-\beta_1x_{t-1}-\beta_2x_{t-2})^2 \\
+  Q_{LA} & \sum_{t=3}^{T}|x_t-\beta_1x_{t-1}-\beta_2x_{t-2}|.
+$$
+
+We seek to minimize this function with respect to $\beta_1$ and $\beta_2$ to obtain their estimate. The first six values in the time series can be seen below:
+
+```{r}
+head(data3A$x)
+```
+
+# 1)
+
+First we will preform a fit of the time series with the two methods, least sum of squares and least sum of absolute value.
+
+```{r}
+## LS model first (then repeat for LA)
+#We start with the fit that we will bootstrap the residuals from
+LS_b <- ARp.beta.est(data3A$x,2)$LS
+LA_b <- ARp.beta.est(data3A$x,2)$LA
+
+LS_em0 <- ARp.resid(data3A$x,LS_b)
+LA_em0 <- ARp.resid(data3A$x,LA_b)
+```
+
+This gives us the estimates of the parameters $\beta_1$ and $\beta_2$,
+
+\begin{align}
+  \text{LS:} \
+  &\hat{\beta}_1 = 1.553 \\
+  &\hat{\beta}_2 = -0.568 \\
+  \text{LA:} \
+  &\hat{\beta}_1 = 1.547 \\
+  &\hat{\beta}_2 = -0.558. \\
+\end{align}ta}\_1 = 1.547 \\ &\hat{\beta}\_2 = -0.558. \\ \\end{align}
+
+To evaluate how good the two parameter estimators are we will perform residual resampling bootstrap. This works by picking two consecutive $x_i, x_{i+1}$ at random from the time series, and predicting $98$ new data points,
+
+```{=tex}
+\begin{align}
+  x_{i}  ,x_{i+1} , x_2^{*} , x_3^{*},...,x_{99}^{*},x_{100}^{*}. \\
+\end{align}
+```
+The data points are predicted by the AR(2) model where the estimated $\hat{\beta}_1$ and $\hat{\beta}_2$ will be used, and the error $e_{t}$ will be bootstrapped by the standardized error, $\hat{\epsilon}_t$. With this bootstrapped time series we can again use the corresponding method of obtaining our $\hat{\beta_i}$ to obtain the bootstrapped $\hat{\beta}_i^{*}$.
+
+With the parameters estimated in the bootstrap ($\hat{\beta_1}^{*}$ and $\hat{\beta}_2^{*}$) we can calculate the bootstrap estimate of bias given by,
+
+```{=tex}
+\begin{align}
+  bias_{\hat{F}}(\beta_{i})&=E_{\hat{F}}[s(X^*)]-t(\hat{F}) \\
+  &= \dfrac{1}{B}\sum_{j=1}^{B}[\hat{\beta}_{ij}^{*}]-\hat{\beta}_{i}, \ \text{for} \ i=1,2.\\
+\end{align}
+```
+Here $\hat{\beta}_{ij}$ is the $j$'th bootstrapped estimate. We will also calculate the variance of the bootstrapped parameters. This will be used to evaluate the performance of the estimators LA and LS.
+
+```{r}
+set.seed(3)
+matrix_of_beta_LS <- matrix(c(NA,NA),nrow=1)
+matrix_of_beta_LA <- matrix(c(NA,NA),nrow=1)
+
+B <- 1500
+for(i in c(1:1500)){
+  random_start <- sample(99,1) #random index for start
+  #find random two starts
+  bootstrap_start <- sapply(c(random_start,random_start+1),function(x) {data3A$x[x]})
+   #random index
+  random_sample <- sample(98,98,replace=T)
+   #now sample random e
+  bootstrap_e <- sapply(random_sample,function(x) {LS_em0[x]})
+  #generate random sequence with the residuals, beta, and random start
+  botsrapped_sequence <- ARp.filter(bootstrap_start,LS_b,bootstrap_e)
+  #fit the regression
+  beta_boot <- ARp.beta.est(botsrapped_sequence,2)$LS
+  matrix_of_beta_LS <- rbind(matrix_of_beta_LS,beta_boot)
+  
+  #Repeat for LA
+  random_start_LA <- sample(99,1)
+  bootstrap_start_LA <- sapply(c(random_start_LA,random_start_LA+1),function(x) {data3A$x[x]})
+  random_sample_LA <- sample(98,98,replace=T)
+  bootstrap_e_LA <- sapply(random_sample_LA,function(x) {LA_em0[x]})
+  botsrapped_sequence_LA <- ARp.filter(bootstrap_start_LA,LA_b,bootstrap_e_LA)
+  beta_boot_LA <- ARp.beta.est(botsrapped_sequence_LA,2)$LS
+  matrix_of_beta_LA <- rbind(matrix_of_beta_LA,beta_boot_LA)
+}
+matrix_of_beta_LS <- matrix_of_beta_LS[-c(1),]
+matrix_of_beta_LA <- matrix_of_beta_LA[-c(1),]
+```
+
+```{r}
+b1_LS_bias <- mean(matrix_of_beta_LS[,1]) - LS_b[1]
+b2_LS_bias <- mean(matrix_of_beta_LS[,2]) - LS_b[2]
+
+b1_LS_var <- var(matrix_of_beta_LS[,1])
+b2_LS_var <- var(matrix_of_beta_LS[,2])
+
+b1_LA_bias <- mean(matrix_of_beta_LA[,1]) - LA_b[1]
+b2_LA_bias <- mean(matrix_of_beta_LA[,2]) - LA_b[2]
+
+b1_LA_var <- var(matrix_of_beta_LA[,1])
+b2_LA_var <- var(matrix_of_beta_LA[,2])
+```
+
+We end up with the following values for the variance and the bootstrap estimate of the bias for the LA and LS:
+
+```{r}
+cat("Beta 1 variance,", b1_LS_var, ", and bias,",b1_LS_bias,", using LS.","\n")
+cat("Beta 1 variance,", b1_LA_var, ", and bias,",b1_LA_bias,", using LA.","\n")
+
+cat("Beta 2 variance,", b2_LS_var, ", and bias,",b2_LS_bias,", using LS.","\n")
+cat("Beta 2 variance,", b2_LA_var, ", and bias,",b2_LA_bias,", using LS.","\n")
+```
+
+We can see that both the variance and the bias is greater for both parameters when the LS estimator is applied. Thus the LA estimator outperforms the LS estimator and is optimal for this data. This can be explained by the fact that the time series is non Gaussian and that the LS estimator is optimal for Gaussian time series. However it does not mean that the LS estimator outperforms the LA estimator on non Gaussian time series, as this is quite a large class of time series.
+
+## 2)
+
+Now we want to compute a prediction interval for $x_{101}$ based on both estimators. To do that we will use bootstrapped time series and parameter estimates obtained in part 1 and in turn use this to simulate a value $x_{101}$ for the observed time series.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+set.seed(3)
+n = length(x)
+#we initialize our value x_101 that we will calculate for all bootstraps
+x_101_LS = rep(0, B)
+x_101_LA = rep(0, B)
+B <- 1500
+for(i in c(1:1500)){
+  random_start_LS <- sample(99,1) #random index for start
+  #find random two starts
+  bootstrap_start_LS <- sapply(c(random_start_LS,random_start_LS+1),function(x) {data3A$x[x]})
+   #random index
+  random_sample_LS <- sample(98,98,replace=T)
+   #now sample random e
+  bootstrap_e_LS <- sapply(random_sample_LS,function(x) {LS_em0[x]})
+  #generate random sequence with the residuals, beta, and random start
+  bootstrapped_sequence_LS <- ARp.filter(bootstrap_start,LS_b,bootstrap_e_LS)
+  #fit the regression and estimate beta
+  beta_boot_LS <- ARp.beta.est(bootstrapped_sequence_LS,2)$LS
+  
+  #Repeat for LA
+  random_start_LA <- sample(99,1)
+  bootstrap_start_LA <- sapply(c(random_start_LA,random_start_LA+1),function(x) {data3A$x[x]})
+  random_sample_LA <- sample(98,98,replace=T)
+  bootstrap_e_LA <- sapply(random_sample_LA,function(x) {LA_em0[x]})
+  bootstrapped_sequence_LA <- ARp.filter(bootstrap_start_LA,LA_b,bootstrap_e_LA)
+  beta_boot_LA <- ARp.beta.est(bootstrapped_sequence_LA,2)$LS
+
+  ### calculate x_101 LS and LA ###
+
+  #calculating residuals
+  bootstrap_e_101_LS=ARp.resid( bootstrapped_sequence_LS,beta_boot_LS)
+  bootstrap_e_101_LA=ARp.resid( bootstrapped_sequence_LA,beta_boot_LA)
+  
+  #random residuals
+  random_residual=sample(1:length(bootstrap_e_101_LS),1)
+  e_101_LS=bootstrap_e_101_LS[random_residual]
+  e_101_LA=bootstrap_e_101_LA[random_residual]
+  #find x_101 using the formula x_101=beta_1*x_99+beta_2*x_100+residual
+  x_101_LS[i]=beta_boot_LS[1]*x[n]+beta_boot_LS[2]*x[n-1]+e_101_LS
+  x_101_LA[i]=beta_boot_LA[1]*x[n]+beta_boot_LA[2]*x[n-1]+e_101_LA
+}
+#calculate quantiles
+q_LS=quantile(x_101_LS,c(0.025,0.0975))
+q_LA=quantile(x_101_LA,c(0.025,0.0975))
+
+#print results
+cat("Quantiles LS",q_LS,"\n")
+cat("Quantiles LA",q_LA,"\n")
+```
+
+```{r}
+df_LS=data.frame(x=x_101_LS)
+p5 <-ggplot(df_LS, aes(x = x)) + geom_histogram(aes(y = ..density..)) + ggtitle("Histogram of the distribution of \n x_101 with LS estimators") + xlab("x_101")  + theme_grey(base_size = 7)
+df_LA = data.frame(x = x_101_LA)
+p6 <- ggplot(df_LA, aes(x = x)) + geom_histogram(aes(y = ..density..)) + ggtitle("Histogram of the distribution of \n x_101 with LA estimators") + xlab("x_101") + theme_grey(base_size = 7)
+grid.arrange(p5,p6, nrow = 1)
+```
+
+Finally we have as a result a slightly bigger limits in the prediction interval for LA than for LS but the distribution for both method of our\$ x\_{101}\$ remains almost the same so that there is no method outperforming the other.
+
+# Problem C
+
+## 4)
+
+However it is possible to find an analytically formula for the likelihood of our observations. For two observations $z_i$ and $u_i$ this can be expressed as,
+
+```{=tex}
+\begin{align}
+  f(z_i,u_i|\theta) \ \text{where,} \ \theta = (\lambda_0,\lambda_1).
+\end{align}
+```
+To continue the derivation, consider the random variable $u_i$. This can only take two values zero and one. Thus it its convenient to find the two find the two PDFs corresponding to $u_i=0$ and $u_i=1$. Consider first the case when $u_i=1$, which implies $X \geq Y$. The corresponding cumulative distribution will then become,
+
+```{=tex}
+\begin{align}
+  F(z_i,u_i=1|\theta) &= P(Y \leq X,X \leq z_i|\theta) \\
+  &= \lambda_0 \lambda_1 \int_0^{z_i}\int_0^{x} e^{-\lambda_0*x}e^{-\lambda_1*y}dydx \\
+  &= \lambda_0 \lambda_1 \int_0^{z_i} e^{-\lambda_0*x} [\dfrac{-1}{\lambda_1}(e^{-\lambda_1*x}-1)]dx \\
+  &= - \lambda_0 \int_0^{z_i} e^{-(\lambda_0 + \lambda_1)x}-e^{-\lambda_0}dx \\
+  &= \dfrac{\lambda_0}{\lambda_0 + \lambda_1} e^{-(\lambda_0 + \lambda_1)z_i} -                     \dfrac{\lambda_0}{\lambda_0 + \lambda_1} - e^{-\lambda_0 z_i} + 1 \\
+  &= \dfrac{\lambda_0}{\lambda_0 + \lambda_1}(e^{-(\lambda_0 + \lambda_1)z_i}-1) - (e^{-\lambda_0 z_i} - 1).
+\end{align}
+```
+For the calculation of $F(z_i,u_i=0|\theta)$, we can use symmetry and see that because our boundary of the integral becomes, $\{(x,y):0 \leq y \leq z_i, 0 \leq y \leq x\}$. This gives the same result however $\lambda_0$ and $\lambda_1$ is interchanged:
+
+```{=tex}
+\begin{align}
+  F(z_i,u_i=0|\theta) &= P(X \leq Y,Y \leq z_i|\theta) \\
+  &= \lambda_0 \lambda_1 \int_0^{z_i}\int_0^{y} e^{-\lambda_0*x}e^{-\lambda_1*y}dxdy \\
+  &= \dfrac{\lambda_1}{\lambda_0 + \lambda_1}(e^{-(\lambda_0 + \lambda_1)z_i}-1) - (e^{-\lambda_1 z_i} - 1).
+\end{align}
+```
+Diriving the cumulative distribution's we then obtain,
+
+```{=tex}
+\begin{align}
+  f(z_i,u_i=j|\theta) =& \dfrac{dF(z_i,u_i=j|\theta)}{dz_i} \\
+  =& \lambda_{1-j} e^{-\lambda_{1-j} z_i}- \lambda_{1-j}e^{-(\lambda_0 + \lambda_1)z_i},
+\end{align}
+```
+which is the marginal probability density function of $f(z_i,u_i|\theta)$. Note that it can be expressed as a fractioned probability density function. So it is possible to find an analytically expression of $f(z_i,u_i|\theta)$.It is not possible to find analytically formulas for the maximum likelihood estimators. This becomes apparent when we try to derive them. Consider the log likelihood function,
+
+```{=tex}
+\begin{align}
+ L(f) =& \Pi_{i=1}^{n} f(z_i,u_i|\theta) \\
+ l(f) =& \sum_{i=1}^{n}ln(I(u_i=0)[\lambda_{1} e^{-\lambda_{1} z_i}- \lambda_{1}e^{-(\lambda_0 + \lambda_1)z_i}]+I(u_i=1)[\lambda_{0} e^{-\lambda_{0} z_i}- \lambda_{0}e^{-(\lambda_0 + \lambda_1)z_i}]). \\
+ =& \sum_{u_i=0}ln(\lambda_{1} e^{-\lambda_{1} z_i}- \lambda_{1}e^{-(\lambda_0 + \lambda_1)z_i})+\sum_{u_i=1}ln(\lambda_{0} e^{-\lambda_{0} z_i}- \lambda_{0}e^{-(\lambda_0 + \lambda_1)z_i}) \\
+ = &\sum_{u_i=0}ln(\lambda_{1})+ln(-\lambda_{1} z_i)+ ln(1- e^{-\lambda_0 z_i})+\sum_{u_i=1}ln(\lambda_{0}) -ln(\lambda_{0} z_i) + ln(1- e^{-\lambda_1 z_i}).\\
+\end{align}
+```
+If we take the derivative with regards to $\lambda_1$ (by symetry it will be the same with switched indexes for \lambda) we obtain,
+
+```{=tex}
+\begin{align}
+  \dfrac{dl(f)}{d\lambda_1} =& \sum_{u_i=0}[\dfrac{1}{ln(\lambda_1)}+ln(-\lambda_1 z_i)] + \sum_{u_i=1}[\dfrac{\lambda_1 e^{-\lambda_1 z_1}}{1-e^{-\lambda_1 z_i}}].
+\end{align}
+```
+It is clear that it is not possible to find an analytically solution to this equation set to zero. Thus we will find it numerically using the log likelihood function.
+
+```{r}
+u_data <- read.delim("u.txt")
+z_data <- read.delim("z.txt")
+u <- u_data$X1
+z <- z_data$X0.2452096
+
+log_likelihod_f <- function(par){
+  return(-1*(sum(log((u<(1/2))*((par[2])*exp(-par[2]*z)-(par[2])*exp(-(par[1]+par[2])*z)) + (u>(1/2))*((par[1])*exp(-par[1]*z)-(par[1])*exp(-(par[1]+par[2])*z))))))
+}
+
+optim(par=c(2,2),log_likelihod_f,method="L-BFGS-B")$par
+```
+
+This gives the solution of $\lambda_0 = 3.46$ and $\lambda_1 = 9.33$. We can see that the values we get by numerically minimizing the log likelihood function with respect to $\lambda_0$ and $\lambda_1$ gives approximately the same result as with the EM-algorithm.
+
+The benefits of directly calculating the our parameters through the log likelihood function when it is possible is computational time. We are guaranteed that the EM-algorithm will converge however it does acquire more computational power. Further more the EM-algorithm can converge to local optima which is not possible when we have an analytically expression for the estimator of our parameters.

@@ -1,0 +1,336 @@
+---
+title: <div align="center">TMA4300; Exercise 3</div>
+author: "Martinius Singdahlsen, Ola Rasmussen, Johan Lagardére"
+output:
+  pdf_document: 
+    toc: yes
+    toc_depth: 2
+fontsize: 12pt
+mainfont: Times New Roman
+spacing: 1.5
+# indent: true
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, fig.align = "center", tidy.opts = list(width.cutoff = 60), fig.height = 8)
+
+library("tidyverse")
+library("ggfortify")
+library("MASS")
+library("knitr")
+library("rmarkdown")
+library("palmerpenguins")
+library("survival")
+```
+
+\newpage
+
+# Problem A:
+
+## Introduction
+
+## 1.
+
+## 2.
+
+\newpage
+
+# Problem B:
+
+## Introduction
+
+We will in this problem use the F-statistic to perform a permutation test of the bilirubin data. The data contain measurements of the concentration of bilirubin (mg/dL) in blood samples taken from three young men. The data can be seen in the table below.
+
+```{r loaddata}
+bilirubin <- read.table("Files/bilirubin.txt",header=T)
+```
+
+```{r bilirubin_table, echo=FALSE}
+df <- data.frame(matrix(NA,nrow=3,ncol=11), row.names = c("Individual 1: ", "Individual 2: ", "Individual 3: "))
+colnames(df) <- rep("",11)
+df[1,] <- t(bilirubin[bilirubin$pers == "p1",]$meas)
+df[2,1:10] <- t(bilirubin[bilirubin$pers == "p2",]$meas)
+df[3,1:8] <- t(bilirubin[bilirubin$pers == "p3",]$meas)
+df[is.na(df)] <- ""
+kable(df, escape = F, caption = "Concentration (mg/dL)")
+```
+
+## 1.
+
+In this part we will use a boxplot to inspect the logarithm of the concentrations for each individual, i.e. the model,
+
+$$
+\tag{B.1}
+log(Y_{ij}) = \beta_i + \epsilon_{ij}, \ \ \text{with \(i = 1, 2, 3\) and \(j = 1,\dots,n_i\) }
+$$
+
+where $n_1 = 11$, $n_2 = 10$ and $n_3 = 8$, and $\epsilon_{ij} \overset{iid}{\sim} \mathcal{N}(0, \sigma^2)$. This boxplot can be seen in Figure $\textcolor{blue}{\text{\underline{\ref{fig:boxplot_Pr_B}}}}$. We will then test the hypothesis that $\beta_1 = \beta_2 = \beta_3$ using the F-Test.
+
+```{r boxplot_Pr_B, fig.cap="Here we have plotted the logarithmic value of the concentrations for each individual. From this we can already see, before performing the F-test, that the three individuals does not seem to be equal, but we cannot be certain."}
+boxplot(log(meas) ~ pers,bilirubin, col = c("red","green","blue"), main = "", xlab = "", names=c("Individual 1","Individual 2","Individual 3"), ylab = "log-values")
+```
+
+```{r f_statistic}
+mod <- lm(log(meas) ~ pers, bilirubin)
+mod_summary = summary(mod)
+Fval <- mod_summary$fstatistic[1]
+cat("F-statistic:", Fval, "with", mod_summary$fstatistic[2], "and", mod_summary$fstatistic[3], "degrees of freedom.")
+```
+
+Our F-statistic is `r as.numeric(Fval[1])`, which is larger than the critical value of `r qf(p=.05, df1 = as.numeric(mod_summary$fstatistic[2]), df2 = as.numeric(mod_summary$fstatistic[3]), lower.tail=FALSE)`, so the hypothesis is rejected. We can therefore say with some certainty that the individuals in the data are not equal.
+
+## 2.
+
+Here we will make a function called **permTest** which generates a permutation of the data, fits the model given in Eq. 2.1, and returns the value of the F-statistic for testing $\beta_1 = \beta_2 = \beta_3$.
+
+```{r permutation_test_function}
+permTest <- function(data,seed) {
+  set.seed(seed)
+  # Permutate the data
+  data$meas <- sample(data$meas)
+  # Fit model
+  mod <- lm(log(meas) ~ pers, data)
+  # Finding F-statistic
+  F_statistic <- summary(mod)$fstatistic[1]
+  return(F_statistic)
+}
+```
+
+## 3.
+
+Do end this problem we will generate 999 samples using the function **permTest** and then find the p-value for **Fval** using these samples.
+
+```{r permutated_samples}
+n <- 999
+F_statistic <- numeric(n)
+# Running 999 iterations
+for (i in 1:n) {F_statistic[i] <- permTest(bilirubin,97+i)}
+# Calculating p-value
+p_value = sum(F_statistic > Fval)/n
+cat("The p-value we get for our F-statistics is", p_value)
+```
+
+We get from the permutation test that our p-value is equal to `r p_value`. This is sufficiently small so we can again reject the hypothesis that all of the individuals are equal. A histogram of our samples are shown in Figure $\textcolor{blue}{\text{\underline{\ref{fig:histogram_Pr_B}}}}$.
+
+```{r histogram_Pr_B, fig.cap="Histogram of our permutated F-statistics. Here we see that our samples follow the Fisher distribution with 2 and 26 degrees of freedom, the blue line. We also see that our F-statistic, the red line, is outside the 95 percent quantile, the red dotted line."}
+hist(F_statistic, xlab = "F-statistics", breaks = 100, main=NULL, freq = F, xlim = c(0,6), ylim = c(0,1), col = "darkgrey")
+lines(seq(0, 6, .01), df(seq(0, 6, .01), df1 = mod_summary$fstatistic[2], df2 = mod_summary$fstatistic[3]), lwd = 5, col = "blue")
+abline(v = Fval, lwd = 5, col = "red")
+abline(v = quantile(F_statistic, probs = c(.95)), lwd = 3, lty = 2, col = "red")
+```
+
+\newpage
+
+# Problem C:
+
+## Introduction
+
+In this final problem we want to use the EM algorithm to find the maximum likelihood estimate for $(\lambda_0, \lambda_1)$. We let $x_1, \dots, x_n$ and $y_1, \dots, y_n$ be independent random variables, where the $x_i \overset{iid}{\sim} \text{Exp}(\lambda_0)$ and $y_i \overset{iid}{\sim} \text{Exp}(\lambda_1)$. We assume that we do not observe $x_1, \dots, x_n$ and $y_1, \dots, y_n$ directly, but that we observe
+
+$$
+\tag{C.1}
+z_i = \text{max}\{x_i, y_i\},
+$$
+
+and
+
+$$
+\tag{C.2}
+u_i = \mathbf{I}(x_i \ge y_i),
+$$
+
+for $i = 1, \dots, n$.
+
+## 1.
+
+We want to find the log likelihood, $f(\mathbf{x}, \mathbf{y} | \lambda_0, \lambda_1)$, for the complete data $(x_i,y_i)$, $i = 1,\dots,n$, and then use this to show that
+
+$$
+\begin{aligned}
+E \Bigl[ ln \bigl( f(\mathbf{x}, \mathbf{y} | \lambda_0, \lambda_1) \bigr) | \mathbf{z}, \mathbf{u},  \lambda_0^{(t)}, \lambda_1^{(t)} \Bigr] &= n \Bigl( ln(\lambda_0) + ln(\lambda_1) \Bigr) \\
+  &- \lambda_0 \sum_{i = 1}^n \Biggl[ u_i z_i + (1 - u_i) \Biggl( \frac{1}{\lambda_0^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_0^{(t)} z_i\} - 1} \Biggr) \Biggr] \\
+  &- \lambda_1 \sum_{i = 1}^n \Biggl[ (1 - u_i) z_i + u_i \Biggl( \frac{1}{\lambda_1^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_1^{(t)} z_i\} - 1} \Biggr) \Biggr].
+\end{aligned}
+$$
+
+We first derive the likelihood
+
+$$
+f(\mathbf{x}, \mathbf{y} | \lambda_0, \lambda_1) = \prod_{i = 1}^n f(x_i, y_i | \lambda_0, \lambda_1)
+  = \prod_{i = 1}^n f(x_i | \lambda_0) f(y_i | \lambda_1)
+  = \prod_{i = 1}^n \lambda_0\lambda_1 e^{-\lambda_0 x_i} e^{-\lambda_1 y_i},
+$$
+
+and then we take the log of this to find the log likelihood
+
+$$
+\begin{aligned}
+ln\bigl[f(\mathbf{x}, \mathbf{y} | \lambda_0, \lambda_1)\bigr] &= ln\Biggl[\prod_{i = 1}^n f(x_i, y_i | \lambda_0, \lambda_1)\Biggr] 
+  = \sum_{i = 1}^n \Bigl[ ln(\lambda_0) + ln(\lambda_1) - \lambda_0 x_i - \lambda_1 y_1 \Bigr] \\
+  &= n\bigl[ln(\lambda_0) + ln(\lambda_1)\bigr] - \lambda_0 \sum_{i = 1}^n x_i - \lambda_1 \sum_{i = 1}^n y_i.
+\end{aligned}
+$$
+
+Using the log likelihood we then find
+
+$$
+\tag{C.3}
+\begin{aligned}
+E \Bigl[ ln \bigl( f(\mathbf{x}, \mathbf{y} | \lambda_0, \lambda_1) \bigr) | \mathbf{z}, \mathbf{u},  \lambda_0^{(t)}, \lambda_1^{(t)} \Bigr] &= n \Bigl( ln(\lambda_0) + ln(\lambda_1) \Bigr) \\
+  &- \lambda_0 \sum_{i = 1}^n E \Bigl[ x_i | z_i, u_i, \lambda_0^{(t)} \Bigr] \\
+  &- \lambda_1 \sum_{i = 1}^n E \Bigl[ y_i | z_i, u_i, \lambda_1^{(t)} \Bigr].
+\end{aligned}
+$$
+
+For $E \Bigl[ x_i | z_i, u_i, \lambda_0^{(t)} \Bigr]$, we have that either $u_i = 1$ or $u_i = 0$. We can then divide this expression into two parts, and when $u_i = 1$, then $z_i = x_i$ , and when $u_i = 0$, then $z_i = y_i$. So we get
+
+$$
+E \Bigl[ x_i | z_i, u_i, \lambda_0^{(t)} \Bigr] = u_i E \Bigl[ x_i | z_i = x_i, u_i = 1, \lambda_0^{(t)} \Bigr] + (1 - u_i) E \Bigl[ x_i | z_i = y_i, u_i = 0, \lambda_0^{(t)} \Bigr],
+$$
+
+where
+
+$$
+\begin{aligned}
+E \Bigl[ x_i | z_i = x_i, u_i = 1, \lambda_0^{(t)} \Bigr] &= z_i, \\ \\
+E \Bigl[ x_i | z_i = y_i, u_i = 0, \lambda_0^{(t)} \Bigr] &= \int_0^{z_i} x_i f(x_i | z_i = y_i, u_i = 0, \lambda_0^{(t)}) \\
+  &= \int_0^{z_i} x_i \frac{\lambda_0^{(t)} \text{exp}\{-\lambda_0^{(t)} x_i\}}{1 - \text{exp}\{-\lambda_0^{(t)} z_i\}} dx_i \\
+  &= \frac{1}{\lambda_0^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_0^{(t)} z_i\} - 1}.
+\end{aligned}
+$$
+
+We therefore get the expression
+
+$$
+\tag{C.4}
+E \Bigl[ x_i | z_i, u_i, \lambda_0^{(t)} \Bigr] = u_i z_i + (1 - u_i) \Biggl( \frac{1}{\lambda_0^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_0^{(t)} z_i\} - 1} \Biggr).
+$$
+
+Similarly for $E \Bigl[ y_i | z_i, u_i, \lambda_1^{(t)} \Bigr]$ we get
+
+$$
+\tag{C.5}
+E \Bigl[ y_i | z_i, u_i, \lambda_1^{(t)} \Bigr] = (1 - u_i) z_i + u_i \Biggl( \frac{1}{\lambda_1^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_1^{(t)} z_i\} - 1} \Biggr).
+$$
+
+Plugging Eq. C.4 and C.5 into Eq. C.3 we get the desired expression.
+
+## 2.
+
+Now we will use the EM algorithm to find the maximum likelihood estimate for $(\lambda_0, \lambda_1)$. To do this we first need to find the recursion in $(\lambda_0^{(t)}, \lambda_1^{(t)})$. To find this recursion we take the derivative of the expression we showed in Problem C:1, here called $Q(\cdot)$, to find an expression that maximizes each value. These recursion can be seen in Eq. C.6 and C.7.
+
+$$
+\begin{aligned}
+\frac{\partial Q(\cdot)}{\partial \lambda_0} &= \frac{n}{\lambda_0} - \sum_{i = 1}^n \Biggl[ u_i z_i + (1 - u_i) \Biggl( \frac{1}{\lambda_0^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_0^{(t)} z_i\} - 1} \Biggr) \Biggr] = 0, \\
+\frac{\partial Q(\cdot)}{\partial \lambda_1} &= \frac{n}{\lambda_1} - \sum_{i = 1}^n \Biggl[ (1 - u_i) z_i + u_i \Biggl( \frac{1}{\lambda_1^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_1^{(t)} z_i\} - 1} \Biggr) \Biggr] = 0.
+\end{aligned}
+$$
+
+We then get
+
+$$
+\tag{C.6}
+\lambda_0^{(t+1)} = \frac{n}{\sum_{i = 1}^n \Biggl[ u_i z_i + (1 - u_i) \Biggl( \frac{1}{\lambda_0^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_0^{(t)} z_i\} - 1} \Biggr) \Biggr]},
+$$
+
+$$
+\tag{C.7}
+\lambda_1^{(t+1)} = \frac{n}{\sum_{i = 1}^n \Biggl[ (1 - u_i) z_i + u_i \Biggl( \frac{1}{\lambda_1^{(t)}} - \frac{z_i}{\text{exp}\{\lambda_1^{(t)} z_i\} - 1} \Biggr) \Biggr]}.
+$$
+
+```{r em, fig.cap="In the first plot we can see the convergence of the expected log likelihood. The second plot shows the convergence of our lambdas. The blue line is lambda0 and the red line is lambda1. We see also here the convergence of each value. We can in these two plots see that the algorithm stabilizes after about 5 iterations."}
+z <- read.table("Files/z.txt")
+u <- read.table("Files/u.txt")
+E_step <- function(lambda, lambdat, z, u) {
+  # Eq. C.3:
+  n <- max(nrow(z),length(z))
+  first <- n * (log(lambda[1]) + log(lambda[2]))
+  second <- lambda[1] * sum(u*z + (1-u) * (1/lambdat[1] - z/(exp(lambdat[1] * z) - 1)))
+  third <- lambda[2] * sum((1-u)*z + u * (1/lambdat[2] - z/(exp(lambdat[2] * z) - 1)))
+  return(first - second - third)
+}
+M_step <- function(lambdat, z, u) {
+  n <- max(nrow(z),length(z))
+  # Eq. C.6:
+  lambda0new <- n/(sum(u*z + (1-u) * (1/lambdat[1] - z/(exp(lambdat[1] * z) - 1))))
+  # Eq. C.7:
+  lambda1new <- n/(sum((1-u)*z + u * (1/lambdat[2] - z/(exp(lambdat[2] * z) - 1))))
+  return(c(lambda0new, lambda1new))
+}
+EMalg <- function(z, u, lambda0 = 1, lambda1 = 1, tol = 1e-10) {
+  conv <- F
+  lambdat <- c(lambda0,lambda1)
+  lambdaall <- matrix(lambdat, ncol = 2)
+  e.log.lik <- c()
+  while (! conv) {
+    lambda <- M_step(lambdat, z, u)
+    e.log.lik <- c(e.log.lik, E_step(lambda, lambdat, z, u))
+    if (length(e.log.lik) >= 2) {if (abs(diff(tail(e.log.lik,2))) < tol) {conv <- T}}
+    lambdat <- lambda
+    lambdaall <- rbind(lambdaall, as.numeric(lambdat))
+  }
+  return(list(eloglikelihoods = e.log.lik, lambdas = lambdat, lambdaall = lambdaall))
+}
+EM <- EMalg(z,u)
+par(mfrow=c(2,1))
+plot(1:length(EM$eloglikelihoods),EM$eloglikelihoods, xlim = c(0,17), ylim = c(200,300), main="Convergence of the expected log likelihood", xlab = "Iteration", ylab = "Value", type = "b", lwd = 3)
+plot(0:length(EM$eloglikelihoods),EM$lambdaall[,1], ylim = c(0, max(EM$lambdaall)), main = "Convergence of lambda", xlab = "Iteration", ylab = "Value", type = "b", lwd = 3, col = "blue")
+lines(0:length(EM$eloglikelihoods),EM$lambdaall[,2], type = "b", lwd = 3, col = "red")
+legend("bottomright", c("lambda0", "lambda1"), col = c("blue", "red"), lwd = 3, inset = .05)
+cat("The final value of lambda0 is", tail(EM$lambdaall[,1],1), "\nThe final value of lambda1 is", tail(EM$lambdaall[,2],1))
+```
+
+```{r include=FALSE}
+lambda0 <- EM$lambdas[1]
+lambda1 <- EM$lambdas[2]
+```
+
+
+From our EM algorithm we get that $\widehat{\boldsymbol{\lambda}} = (\widehat\lambda_0,\widehat\lambda_1)^T = (`r lambda0`,`r lambda1`)^T$. The algorithm was stopped when the difference between the old expected log likelihood and the new was smaller than 1e-5. The convergence of our algorithm can be seen in Figure $\textcolor{blue}{\text{\underline{\ref{fig:em}}}}$.
+
+\newpage
+
+## 3.
+
+To find the standard deviation and the biases of $\widehat{\boldsymbol{\lambda}}$ we will use bootstrapping. We will also find $\text{Corr}[\widehat\lambda_0,\widehat\lambda_1]$. The pseudocode for the bootstrapping algorithm can be seen below.
+
+    # Pseudocode:
+    # Start
+    Compute lambda0 and lambda1 from EM-algorithm
+    for b in 1:B:
+      Draw x_1, ..., x_n from exp. distr. with intensity lambda0
+      Draw y_1, ..., y_n from exp. distr. with intensity lambda1
+      Set zz from Eq. C.1 and uu from Eq. C.2
+      Use EM-algorithm with these new bootstrapped zz and uu to find new lambdas
+    # End
+    
+
+```{r em_bootstrap}
+set.seed(98)
+B <- 1e4
+n <- nrow(z)
+lambda <- EM$lambdas
+lambdastorage <- data.frame(matrix(NA,ncol = 2,nrow = B))
+for (b in 1:B) {
+  x <- rexp(n,lambda[1])
+  y <- rexp(n,lambda[2])
+  zz <- pmax(x,y)
+  uu <- ifelse(x >= y, 1, 0)
+  lambdastorage[b,] <- EMalg(zz,uu)$lambdas
+}
+```
+
+```{r lambda_table, echo=FALSE}
+est <- data.frame(matrix(NA, nrow = 2, ncol = 3), row.names = c("lambda0", "lambda1"))
+est[1,] <- as.numeric(c(sd(lambdastorage[,1]), mean(lambdastorage[,1]) - lambda[1], cor(lambdastorage[,1], lambdastorage[,2])))
+est[2,] <- as.numeric(c(sd(lambdastorage[,2]), mean(lambdastorage[,2]) - lambda[2], cor(lambdastorage[,1], lambdastorage[,2])))
+kable(est, escape = F, caption = "Standard Deviation, Bias, and Correlation of lambda0 and lambda1", col.names = c("Standard Deviation:", "Bias:", "Correlation:"))
+```
+
+
+
+\newpage
+
+## 4.
+
+

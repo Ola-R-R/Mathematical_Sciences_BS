@@ -1,0 +1,459 @@
+---
+title: <div align="center">TMA4275; Project 3</div>
+author: "Ola Rasmussen"
+output:
+  pdf_document: 
+    toc: yes
+    toc_depth: 2
+fontsize: 12pt
+mainfont: Times New Roman
+spacing: 1.5
+indent: true
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, fig.align = "center", tidy.opts = list(width.cutoff = 60), fig.height = 8)
+
+library("tidyverse")
+library("ggfortify")
+library("MASS")
+library("knitr")
+library("rmarkdown")
+library("palmerpenguins")
+library("survival")
+```
+
+\newpage
+
+# Problem 1:
+
+## Introduction
+
+In this problem we will study a tire failure known as tread and belt separation (TBS) in Kristov et al (2002).
+
+## a)
+
+Here we will use the R function *coxph* to redo the two Cox regression analyses reported in Tables 2 and 3 in Kristov et al (2002), and then discuss the importance of the various covariates.
+
+```{r}
+tire <- read.csv("Filer/tire.txt", sep="")
+
+mod <- coxph(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(mod)
+
+modsign <- coxph(Surv(Survival, Censor) ~ Wedge + Inter + Peel + WxP, tire)
+summary(modsign)
+```
+
+\noindent We see here that Age and WxP are the only covariates that are positive, i.e. they extend the life of the wheel a lot more than the other covariates.
+
+\newpage
+
+## b)
+
+Now we will write our own R code, using the Breslow estimator, to estimate the integrated hazard rate for a component with all covariate values equal to unity, $A_0(t, x_0)$, for each of the two models considered in a). We will then compare them by plotting them. This can be seen in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig1}}}}$. We will also find the corresponding estimated survival functions and visualize them in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig2}}}}$. The Breslow esimator is given by,
+
+$$
+\tag{1.1}
+\widehat{A}_0(t) = \sum_{T_j \le t} \frac{1}{\sum_{l \in \Re_j} r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_l(T_j))} = \sum_{T_j \le t} \frac{1}{\sum_{l \in \Re_j} exp\Bigl( \widehat{\boldsymbol{\beta}}^T \cdot \mathbf{x}_l(T_j) \Bigr)},
+$$
+
+\noindent where $\Re_j$ is all the individuals who are alive just before $T_j$. To handle ties, we will take the average of the combinations happening at the same time. But if the covariates are fixed, as they are in our problem, we may use,
+
+$$
+\tag{1.2}
+\widehat{A}(t | \mathbf{x}_0) = \widehat{A}_0(t) \cdot r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_0) = \widehat{A}_0(t) \cdot exp\Bigl( \widehat{\boldsymbol{\beta}}^T \Bigr) = \sum_{T_j \le t} \frac{exp\Bigl( \widehat{\boldsymbol{\beta}}^T \Bigr)}{\sum_{l \in \Re_j} exp\Bigl( \widehat{\boldsymbol{\beta}}^T \cdot \mathbf{x}_l(T_j) \Bigr)}.
+$$
+
+\noindent which is plotted in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig1}}}}$. The corresponding survival function is given by,
+
+$$
+\tag{1.3}
+\widehat{S}(t | \mathbf{x}_0) = \prod_{j | T_j \le t}\bigl( 1 - \Delta\widehat{A}(T_j | \mathbf{x}_0) \bigr),
+$$
+
+\noindent which is plotted in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig2}}}}$.
+
+```{r}
+tireo <- tire[order(tire$Survival),]
+betasmod <- as.numeric(coef(mod))
+betasmodsign <- c(as.numeric(modsign$coefficients))
+
+hatA <- function(tireo, betas) {
+  Amod <- c()
+  tireoc <- tireo[tireo$Censor == 1,]$Survival
+  for (i in unique(tireoc)) {
+    Amoddenom <- c()
+    denom <- c()
+    tireotime <- tireo[tireo$Survival >= i,]
+    for (j in 1:nrow(tireotime)) {
+      if (i %in% tireoc[duplicated(tireoc)]) {
+        ties = c()
+        for (k in 1:2) {
+          ties <- c(ties, exp(sum(betas * c(as.numeric(tireotime[j,1:(ncol(tireotime) - 2)])))))
+        }
+        denom <- c(denom, sum(ties)/2)
+      } else {
+        denom <- c(denom, exp(sum(betas * c(as.numeric(tireotime[j,1:(ncol(tireotime) - 2)])))))
+      }
+    }
+    Amoddenom <- c(Amoddenom, sum(denom))
+    Amod <- c(Amod, exp(sum(c(t(betas))))/Amoddenom)
+  }
+  return(cumsum(Amod))
+}
+```
+
+```{r fig1, fig.cap="Here we have plotted the Breslow estimators for the two models. The blue line is for the full model, and the red is for the significant model. We see that using the significant model, the tires tend to fail at a faster rate than the full model."}
+plot(unique(tireo[tireo$Censor == 1,]$Survival), hatA(tireo,betasmod), type = "s", lwd = 3, ylim = c(0,.5), col="blue", main = "Breslow estimators", xlab = "Time", ylab = "Value")
+lines(unique(tireo[tireo$Censor == 1,]$Survival), hatA(tireo[,c(2,3,5,7,8,9)],betasmodsign), type = "s", lwd = 3, col="red")
+```
+
+```{r fig2, fig.cap="Here we have plotted the corresponding estimated survival functions for the two models. The blue line is for the full model, and the red is for the significant model. We see also here that the tires tend to fail at a faster rate than the full model."}
+plot(unique(tireo[tireo$Censor == 1,]$Survival),cumprod(1-hatA(tireo,betasmod)), type = "s", lwd = 3, xlim=c(0,1.3), ylim = c(.4,1), col = "blue", main = "Estimated survival functions", xlab = "Time", ylab = "Value")
+lines(unique(tireo[tireo$Censor == 1,]$Survival),cumprod(1-hatA(tireo[,c(2,3,5,7,8,9)],betasmodsign)), type = "s", lwd = 3, col = "red")
+```
+
+\newpage
+
+## c)
+
+Now, using the R function *survreg*, we will redo the two analysis in a) using a Weibull regression model. Then we will transform the estimated parameter values so that they have the same interpretation as for the Cox regression models.
+
+```{r}
+modwei <- survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(modwei)
+
+modsignwei <- survreg(Surv(Survival, Censor) ~ Wedge + Inter + Peel + WxP, tire)
+summary(modsignwei)
+```
+
+```{r}
+weib.coef.ph <- -modwei$coef[2:8]/modwei$scale
+coxph.coef <- mod$coef
+weib.coef.ph.sign <- -modsignwei$coef[2:5]/modsignwei$scale
+coxph.coef.sign <- modsign$coef
+
+data.frame(weib.coef.ph, coxph.coef)
+data.frame(weib.coef.ph.sign, coxph.coef.sign)
+```
+
+\noindent We see that in the full models, all the estimated values are pretty similar except for Age and Carbon, but in the significant models they are all very similar.
+
+\newpage
+
+## d)
+
+The estimated survival functions formula is given by,
+
+$$
+\begin{aligned}
+S(t) &= e^{- \int_0^t \alpha(s) ds} \\
+  &= e^{- \int_0^t \alpha_0(s)r(\beta) ds} \\
+  &= e^{-r(\beta)\int_0^t \alpha_0(s) ds} \\
+  &= e^{-r(\beta) H(t)} \\
+  &= e^{-r(\beta) \cdot (-log(1-F(t)))} \\
+  &= e^{r(\beta) \cdot log(1-F(t))} \\
+  &= e^{e^{\beta^T} \cdot pweibull(t, \ shape, \ scale, \ lower=F, \ log=T)}. \\
+\end{aligned}
+$$
+
+\noindent  where $H(t)$ is the baseline hazard rate and is found in the documentation of the Weibull functions in R. This can be seen plotted in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig3}}}}$ for both the full model and the significant model.
+
+```{r fig3, fig.cap="Here we have plotted the estimated survival functions for the two Weibull models. The blue line is for the full model, and the red is for the significant model. We see also here that the tires tend to fail at a faster rate using the significant model."}
+t = seq(0,1.3,.01)
+plot(t,exp(exp(sum(weib.coef.ph)) * pweibull(t,shape = 1/(modwei$scale), scale = exp(as.numeric(modwei$coef[1])),lower=F,log=T)),type="l", ylim = c(0,1), col = "blue", main = "Survival functions for the Weibull models", xlab = "Time", ylab = "Value")
+lines(t,exp(exp(sum(weib.coef.ph.sign)) * pweibull(t,shape = 1/(modsignwei$scale), scale = exp(as.numeric(modsignwei$coef[1])),lower=F,log=T)), col = "red")
+```
+
+\newpage
+
+The martingale residuals are given by,
+
+$$
+\tag{1.4}
+\widehat{M}_i = \widehat{M}_i(\tau) = N_i(\tau) - \widehat{\Lambda}_i(\tau),
+$$
+
+\noindent where $\widehat{\Lambda}_i(t)$, the estimated cumulative intensity process, is given by,
+
+$$
+\tag{1.5}
+\widehat{\Lambda}_i(\tau) = \sum_{T_j \le \tau}\frac{Y_i(T_j)r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_i(T_j))}{\sum_{l \in \Re_j} r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_l(T_j))}.
+$$
+
+I struggled with writing this into code, but I want to explain that I understand the formula. We are finding the martingale residuals to the 11 uncensored individuals in the dataset, i.e. the $i$'s. $N_i(\tau) = 1$ when $\tau = 1.3$, because all the tires have failed before that time. $Y_i(T_j)$ is 1 right up to the moment tire $i$ fails at one of the $T_j$'s, so we don't have to add the rest after the survival time of that individual, i.e. $\tau$ in Eq. 1.5 becomes the failure time of individual $i$. The denominator is handled in the same way that i handled the denominator in the Breslow estimator. I will include the code below to show what i have.
+
+```{r eval=FALSE}
+martingale_resid <- function(tireo,betas) {
+  tireoc <- tireo[tireo$Censor == 1,]$Survival
+  Y <- as.data.frame(matrix(nrow = length(tireoc), ncol = length(unique(tireoc))))
+  lambda <- c()
+  
+  for (individ in 1:length(tireoc)) {
+    Amod <- c()
+    for (i in unique(tireoc)) {
+      Amoddenom <- c()
+      denom <- c()
+      tireotime <- tireo[tireo$Survival >= i,]
+      for (j in 1:nrow(tireotime)) {
+        if (i %in% tireoc[duplicated(tireoc)]) {
+          ties = c()
+          for (k in 1:2) {
+            ties <- c(ties, exp(sum(betas * c(as.numeric(tireotime[j,1:(ncol(tireotime) - 2)])))))
+          }
+          denom <- c(denom, sum(ties)/2)
+        } else {
+          denom <- c(denom, exp(sum(betas * c(as.numeric(tireotime[j,1:(ncol(tireotime) - 2)])))))
+        }
+      }
+      Amoddenom <- c(Amoddenom, sum(denom))
+      Amod <- c(Amod, 1/Amoddenom)
+    }
+    
+    lambda <- c(lambda, sum((exp((sum(c(t(betas) * as.numeric(tireo[tireo$Censor == 1,][individ,1:(ncol(tireo) - 2)]))))) * Amod) * Y[individ,]))
+  }
+  return(lambda)
+}
+
+# plot(1:11, 1 - martingale_resid(tireo,weib.coef.ph))
+```
+
+Now we will check if an exponential regression model give a good fit. The pdf of an exponential distribution is,
+
+$$
+f(t;\lambda) = \lambda e^{-\lambda t},
+$$
+
+\noindent and the pdf of a weibull distribution is,
+
+$$
+f(t;a,\sigma) = \frac{a}{\sigma} \left(\frac{t}{\sigma}\right)^{a-1} e^{-\left(\frac{t}{\sigma}\right)^a}.
+$$
+
+```{r}
+ourshape <- 1/(modwei$scale)
+ourshapesign <- 1/(modsignwei$scale)
+cat("a =", ourshape, "for the full model",
+    "\na =", ourshapesign, "for the significant model")
+```
+
+\noindent We see here that the exponential distribution is just a special case of the Weibull distribution when $a = 1$ and $\sigma = \frac{1}{\lambda}$. In our two cases, the shapes for the full and significant models are $16.77$ and $16.75$ respectively. So we can conclude with that the exponential distribution would not give a good fit because the shape, a, of our Weibull distribution is a lot bigger than 1.
+
+\newpage
+
+## e)
+
+When using backward elimination process, we first begin with fitting the full model, and then subsequently removing the variable with the highest p-value, until we have only significant variables left (p-value smaller than 0.05).
+
+```{r}
+modweielim1 <- survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(modweielim1)$table
+modweielim2 <- update(modweielim1, . ~ Wedge + Inter + EB2B + Peel + Carbon + WxP)
+summary(modweielim2)$table
+modweielim3 <- update(modweielim1, . ~ Wedge + Inter + Peel + Carbon + WxP)
+summary(modweielim3)$table
+modweielim4 <- update(modweielim1, . ~ Wedge + Inter + Peel + WxP)
+summary(modweielim4)$table
+```
+
+\noindent We find the same significant model as they do in Kristov et al (2002), which makes sense because they use the same method.
+
+\newpage
+
+# Problem 2:
+
+## Introduction
+
+In this problem we will simulate many different datasets using the significant model we got in 1:e). We will later compare those datasets with the original.
+
+## a)
+
+We will now make a function that simulates survival times from our model. We will simulate using the probability integral transform method. We have the survival function of the Weibull distribution,
+
+$$
+S_i(t) = e^{-A(t)} = e^{-r(\beta;x)A_0(t)} = e^{- exp(\beta^Tx_i) (\frac{t_i}{\sigma})^a},
+$$
+
+\noindent where $\sigma$ is the scale, and $a$ is the shape. This gives us,
+
+$$
+u_i = 1 - S_i(t) = 1 - e^{- exp(\beta^T x_i) \left(\frac{t_i}{\sigma}\right)^a},
+$$
+
+$$
+\left(\frac{t_i}{\sigma}\right)^a = -\frac{1}{exp(\beta^T x_i)} ln(1-u_i),
+$$
+
+$$
+\tag{2.1}
+t_i = \left(-\frac{\sigma^a}{exp(\beta^T x_i)} ln(1 - u_i)\right).
+$$
+
+\noindent This equation is used to sample the new survival times. The censoring times will be samples using rexp. With rate 0.95 we get a similar amount of censored survival times to the original dataset, as seen below the function.
+
+```{r}
+sim2a <- function(tire, modweielim4, seed = 98) {
+  weib.coef.ph.sign <- -modsignwei$coef[2:5]/modsignwei$scale
+  set.seed(seed)
+  logu <- log(1 - runif(nrow(tire)))
+  a <- 1/(modweielim4$scale)
+  sigma <- exp(as.numeric(modweielim4$coef[1]))
+  K <- c()
+  for (i in 1:nrow(tire)) {
+    K <- c(K, exp(sum(t(weib.coef.ph.sign)*as.numeric(tire[i,c(2,3,5,7)]))))
+  }
+  # Eq. 2.1:
+  t <- (-((sigma^a)/K) * logu)^(1/a)
+  censoredtimes <- rexp(nrow(tire),.95)
+  tildeTT <- c()
+  D <- c()
+  for (i in 1:nrow(tire)) {
+    tildeTT[i] <- min(t[i], censoredtimes[i])
+    ifelse(t[i] <= censoredtimes[i], D[i] <- 1, D[i] <- 0)
+  }
+  tiresim <- data.frame(Survival = t, Censor = D)
+  return(tiresim)
+}
+d <- c()
+for (i in 1:500) {
+  d <- c(d,sim2a(tire,modweielim4,i)$Censor)
+}
+cat("Number of censored times in the original dataset:   ", length(tire$Censor[tire$Censor == 0]),
+    "\nNumber of censored times in 500 simulated datasets: ", length(d[d == 0])/500)
+```
+
+## b)
+
+Here we will make a function that automatically finds the significant model using the backward elimination process.
+
+```{r}
+fun2b <- function(full_model) {
+  model <- full_model
+  finished <- F
+  while (finished == F) {
+    model_summary <- data.frame(t(summary(model)$table[,4]))
+    model_summary <- model_summary[,-c(1,ncol(model_summary))]
+    if (max(model_summary) > .05) {
+      model_summary <- model_summary[-max.col(model_summary)]
+      model <- update(model, as.formula(paste(".~", paste(colnames(model_summary), collapse= "+"))))
+    } else {
+      final_model <- update(model, as.formula(paste(".~", paste(colnames(model_summary), collapse= "+"))))
+      finished <- T
+    }
+  }
+  return(summary(final_model)$table)
+}
+```
+
+```{r}
+simdat1 <- tire
+simdat1[,8:9] <- sim2a(tire,modweielim4)
+simbestreg1 <- fun2b(survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, simdat1))
+mod1 <- survreg(as.formula(paste("Surv(Survival, Censor) ~", paste(rownames(simbestreg1[2:(nrow(simbestreg1)-1),]), collapse= "+"))), simdat1)
+simreg1 <- summary(mod1)
+```
+
+The formula for the estimated intensity process is,
+
+$$
+\widehat\lambda_i(t) = Y_i(t) r(\widehat\beta; x_i) \alpha_0(t),
+$$
+
+\noindent for individual $i$. $\alpha_0(t) = \frac{a}{\sigma^a}t^{a-1}$ is the baseline hazard rate of a Weibull distribution. We will test the first, middle, and last case in the simulated dataset. Here i got pretty weird results, so bad in fact that they are uncomparible to the original hazard rate. Unfortunately don't have the time to find out what i did wrong.
+
+```{r}
+Y11 <- stepfun(simdat1$Survival[1],1:0, right = T)
+Y117 <- stepfun(simdat1$Survival[17],1:0, right = T)
+Y134 <- stepfun(simdat1$Survival[34],1:0, right = T)
+a1 <- 1/(mod1$scale)
+sigma1 <- exp(as.numeric(mod1$coef[1]))
+Y1 <- stepfun(tire$Survival[1],1:0, right = T)
+Y17 <- stepfun(tire$Survival[17],1:0, right = T)
+Y34 <- stepfun(tire$Survival[34],1:0, right = T)
+a <- 1/(modsignwei$scale)
+sigma <- exp(as.numeric(modwei$coef[1]))
+
+plot(t, Y11(t) * exp(sum(simreg1$coef[-1] * simdat1[1,c(2,3,5,7)])) * ((1/(mod1$scale))/(exp(as.numeric(mod1$coef[1]))^(1/(mod1$scale)))) * t^((1/(modwei$scale))-1), type = "l", col = "green", main = "Intensity processes", xlab = "Time", ylab = "Value")
+lines(t, Y1(t) * exp(sum(modweielim4$coef[-1] * tire[1,c(2,3,5,7)])) * ((1/(modsignwei$scale))/(exp(as.numeric(modsignwei$coef[1]))^(1/(modsignwei$scale)))) * t^((1/(modsignwei$scale))-1), lty = 2, type = "l", col = "green")
+lines(t, Y117(t) * exp(sum(simreg1$coef[-1] * simdat1[17,c(2,3,5,7)])) * ((1/(mod1$scale))/(exp(as.numeric(mod1$coef[1]))^(1/(mod1$scale)))) * t^((1/(modwei$scale))-1), type = "l", col = "blue")
+lines(t, Y17(t) * exp(sum(modweielim4$coef[-1] * tire[17,c(2,3,5,7)])) * ((1/(modsignwei$scale))/(exp(as.numeric(modsignwei$coef[1]))^(1/(modsignwei$scale)))) * t^((1/(modsignwei$scale))-1), lty = 2, type = "l", col = "blue")
+lines(t, Y134(t) * exp(sum(simreg1$coef[-1] * simdat1[34,c(2,3,5,7)])) * ((1/(mod1$scale))/(exp(as.numeric(mod1$coef[1]))^(1/(mod1$scale)))) * t^((1/(modwei$scale))-1), type = "l", col = "red")
+lines(t, Y34(t) * exp(sum(modweielim4$coef[-1] * tire[34,c(2,3,5,7)])) * ((1/(modsignwei$scale))/(exp(as.numeric(modsignwei$coef[1]))^(1/(modsignwei$scale)))) * t^((1/(modsignwei$scale))-1), lty = 2, type = "l", col = "red")
+```
+
+```{r}
+simdat2 <- tire
+simdat2[,8:9] <- sim2a(tire,modweielim4,1)
+simbestreg2 <- fun2b(survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, simdat2))
+simreg2 <- summary(survreg(as.formula(paste("Surv(Survival, Censor) ~", paste(rownames(simbestreg2[2:(nrow(simbestreg2)-1),]), collapse= "+"))), simdat1))
+simdat3 <- tire
+simdat3[,8:9] <- sim2a(tire,modweielim4,2)
+simbestreg3 <- fun2b(survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, simdat3))
+simreg3 <- summary(survreg(as.formula(paste("Surv(Survival, Censor) ~", paste(rownames(simbestreg3[2:(nrow(simbestreg3)-1),]), collapse= "+"))), simdat1))
+```
+
+\newpage
+
+## c)
+
+Now to end this problem, we will simulate many datasets, find for each of the seven covariates the proportion of the fitted models that includes the covariate, and finally plot all the estimated survival functions for each of the fitted models. The plots can be found in Figure $\textcolor{blue}{\text{\underline{\ref{fig:fig4}}}}$. We will here test 500 iterations.
+
+```{r}
+t <- seq(0,2,.01)
+S <- as.data.frame(matrix(0, nrow = 500, ncol = 7))
+colnames(S) <- c("Age", "Wedge", "Inter", "EB2B", "Peel", "Carbon", "WxP")
+covariates <- c()
+scales <- c()
+intercept <- c()
+datasets <- tire
+it <- (1:514)[-c(15,125,154,202,203,235,296,321,328,352,355,374,414,463)]
+l = 1
+for (i in it) {
+  datasets[,8:9] <- sim2a(tire, modweielim4, i)
+  simbestreg <- fun2b(survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, datasets))
+  covariates <- c(covariates, rownames(simbestreg[-c(1,nrow(simbestreg)),]))
+  simreg <- (survreg(as.formula(paste("Surv(Survival, Censor) ~", paste(rownames(simbestreg[2:(nrow(simbestreg)-1),]), collapse= "+"))), datasets))
+  beta <- -simreg$coef[-1]/simreg$scale
+  scales <- c(scales, simreg$scale)
+  intercept <- c(intercept, simreg$coef[1])
+  for (k in 1:length(beta)) {
+    if (names(beta)[k] == "Age") {
+      S[l,1] <- beta[k]
+    } else if (names(beta)[k] == "Wedge") {
+      S[l,2] <- beta[k]
+    } else if (names(beta)[k] == "Inter") {
+      S[l,3] <- beta[k]
+    } else if (names(beta)[k] == "EB2B") {
+      S[l,4] <- beta[k]
+    } else if (names(beta)[k] == "Peel") {
+      S[l,5] <- beta[k]
+    } else if (names(beta)[k] == "Carbon") {
+      S[l,6] <- beta[k]
+    } else if (names(beta)[k] == "WxP") {
+      S[l,7] <- beta[k]
+    }
+  }
+  l = l+1
+}
+```
+
+```{r}
+cat("Age appeared in", paste(length(covariates[covariates == "Age"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nWedge appeared in", paste(length(covariates[covariates == "Wedge"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nInter appeared in", paste(length(covariates[covariates == "Inter"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nEB2B appeared in", paste(length(covariates[covariates == "EB2B"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nPeel appeared in", paste(length(covariates[covariates == "Peel"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nCarbon appeared in", paste(length(covariates[covariates == "Carbon"])/length(it)*100,"%",sep=""), "of the models,",
+    "\nWxP appeared in", paste(length(covariates[covariates == "WxP"])/length(it)*100,"%",sep=""), "of the models,")
+```
+
+\noindent This makes sense considering we are simulating from a distribution that is only dependent on Wedge, Inter, Peel, and WxP. We see that Peel is the most importan covariate because is appears if all of our tested models.
+
+```{r fig4, fig.cap="Here we see all the simulated survival functions. The red line is the survival function of the true dataset, while the blue lines are the survival functions of the simulated datasets. We can see that the simulated survival times are a bit skewed to the right, but not by much."}
+plot(t,exp(exp(sum(S[1,])) * pweibull(t,shape = 1/(scales[1]), scale = exp(as.numeric(intercept[1])),lower=F,log=T)),type="l", ylim = c(0,1), col = "blue", main = "Survival functions of all the datasets", xlab = "time", ylab = "Value")
+for (i in 2:500) {
+  lines(t,exp(exp(sum(S[i,])) * pweibull(t,shape = 1/(scales[i]), scale = exp(as.numeric(intercept[i])),lower=F,log=T)), col = "blue")
+}
+lines(t,exp(exp(sum(weib.coef.ph.sign)) * pweibull(t,shape = 1/(modsignwei$scale), scale = exp(as.numeric(modsignwei$coef[1])),lower=F,log=T)), lwd = 3, col = "red")
+```

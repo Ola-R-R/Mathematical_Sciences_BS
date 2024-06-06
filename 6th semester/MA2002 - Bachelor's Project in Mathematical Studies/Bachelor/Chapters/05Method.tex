@@ -1,0 +1,36 @@
+
+\section{Collecting Data}
+
+\noindent All of the data used in this thesis is collected from the official NBA website and Basketball Reference seen below:
+
+\begin{itemize}
+  \item \url{https://www.nba.com/stats/teams/boxscores-traditional}
+  \item \url{https://www.basketball-reference.com/}.
+\end{itemize}
+
+\section{Data management}
+
+\noindent All the data was changed into the format seen in Table \ref{table:dataSaved}. Attacking team $i$ is the team attacking defending team $j$, $y$ is the number of scores obtained, type is the scoring type, i.e. when type 3 means three pointer and so on. Home court is "yes" if attacking team $i$ is playing on their home court. Date shows the number of days after the first game saved in the data. Win shows what team won the match. Covid indicate whether we are looking at the Covid season or a normal season, and Number of fans says how many fans were present.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ |p{1.8cm}|p{1.8cm}|p{.5cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1.5cm}|  }
+    \hline
+    Attacking Team $i$ & Defending Team $j$ & $y$ & Type & Home Court & Date & Win & Covid & Number of Fans \\
+    \hline
+    LAL & HOU & $3$ & $3$ & yes & $1$ & no & no & $18997$ \\
+    LAL & HOU & $25$ & $2$ & yes & $1$ & no & no & $18997$ \\
+    LAL & HOU & $31$ & $1$ & yes & $1$ & no & no & $18997$ \\
+    \hline
+    HOU & LAL & $12$ & $3$ & no & $1$ & yes & no & $18997$ \\
+    HOU & LAL & $19$ & $2$ & no & $1$ & yes & no & $18997$ \\
+    HOU & LAL & $34$ & $1$ & no & $1$ & yes & no & $18997$ \\
+    \hline
+\end{tabular}
+\caption{Six rows of the data frame containing data for one match between the Los Angeles Lakers and the Houston Rockets}
+\label{table:dataSaved}
+\end{table}
+
+\section{Model Selection Method}
+
+\noindent To find the best model, I used the covariates Type, Home, and Covid. Type is the scoring type, Home is the home advantage, and Covid indicate the covid season. I made many different combinations of these covariates with different interactions and compared them using their AIC value. If two models had the same AIC, i used the Likelihood Ratio Test to find significant terms. These models can be seen in Table \ref{table:AICchangeCovid}.

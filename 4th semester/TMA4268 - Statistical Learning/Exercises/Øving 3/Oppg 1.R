@@ -1,0 +1,43 @@
+library(ISLR)
+library(GGally)
+Auto = subset(Auto, select = -name)
+# Auto$origin = factor(Auto$origin)
+summary(Auto)
+str(Auto)
+Auto$origin = factor(Auto$origin)
+ggpairs(Auto, lower = list(continuous = wrap("points", size=0.1))) + # change points size
+   theme(text = element_text(size = 7)) # change text size
+cor(Auto[, -c(8)])
+
+fit.lm = lm(mpg ~ ., data = Auto)
+summary(fit.lm)
+
+anova(fit.lm)
+
+library(ggfortify)
+autoplot(fit.lm, smooth.colour = NA)
+
+set.seed(2332)
+n = 100
+par(mfrow = c(2, 3))
+for (i in 1:6) {
+   sim = rnorm(n)
+   qqnorm(sim, pch = 1, frame = FALSE)
+   qqline(sim, col = "blue", lwd = 1)
+}
+
+fit.lm1 = lm(mpg ~ displacement + weight + year * origin, data = Auto)
+summary(fit.lm1)
+
+anova(fit.lm1)
+
+# try 3 predictor transformations
+Auto$sqrtmpg <- sqrt(Auto$mpg)
+fit.lm3 = lm(sqrtmpg ~ displacement + weight + year + origin, data = Auto)
+autoplot(fit.lm3)
+
+fit.lm4 = lm(mpg ~ displacement + I(log(weight)) + year + origin, data = Auto)
+autoplot(fit.lm4)
+
+fit.lm5 = lm(mpg ~ displacement + I(weight^2) + year + origin, data = Auto)
+autoplot(fit.lm5)

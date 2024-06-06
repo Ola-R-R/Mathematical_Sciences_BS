@@ -1,0 +1,21 @@
+plot(1:ncol(one_p_A.OU.T),one_p_A.OU.T[10,], col = league_pal("nba")[10],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24",ylab="")
+plot(1:ncol(two_p_A.OU.T),two_p_A.OU.T[10,], col = league_pal("nba")[10],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24 when season is active",ylab="")
+plot(1:ncol(thr_p_A.OU.T),thr_p_A.OU.T[10,], col = league_pal("nba")[10],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24 when season is active",ylab="")
+
+
+plot(1:ncol(one_p_A.OU.T),one_p_A.OU.T[11,], col = league_pal("nba")[11],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24",ylab="")
+plot(1:ncol(two_p_A.OU.T),two_p_A.OU.T[11,], col = league_pal("nba")[11],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24 when season is active",ylab="")
+plot(1:ncol(thr_p_A.OU.T),thr_p_A.OU.T[11,], col = league_pal("nba")[11],type="l",ylim=c(-.6,.6), xlab = "Days after 28.10.24 when season is active",ylab="")
+
+
+plot(corrr.Fans, col = league_pal("nba"), cex = 2, pch = 16, cex.axis = .7)
+
+
+
+
+barplot(rf.mod.Best.T$cond$ATTACK$TYPE1, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.T$cond$DEFENCE$TYPE1, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.T$cond$ATTACK$TYPE2, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.T$cond$DEFENCE$TYPE2, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.T$cond$ATTACK$TYPE3, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.T$cond$DEFENCE$TYPE3, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.T$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))

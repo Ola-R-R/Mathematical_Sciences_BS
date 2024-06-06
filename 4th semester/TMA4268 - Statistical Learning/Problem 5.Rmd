@@ -1,0 +1,102 @@
+---
+title: "Problem xy (use separate files for each problem)"
+author: '10111'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  word_document: default
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=TRUE, size="scriptsize",fig.width=4, fig.height=3)
+
+```
+
+```{r,eval=FALSE,echo=TRUE}
+install.packages("knitr")
+install.packages("MASS")
+install.packages("caret")
+install.packages("pls")
+install.packages("glmnet")
+install.packages("gam")
+install.packages("gbm")
+install.packages("randomForest")
+install.packages("ggfortify")
+install.packages("leaps")
+install.packages("pROC")
+install.packages("sfsmisc")
+```
+
+```{r,eval=TRUE,echo=FALSE}
+library(knitr)
+library(MASS)
+library(keras)
+library(caret)
+library(pls)
+library(glmnet)
+library(gam)
+library(gbm)
+library(randomForest)
+library(ggfortify)
+library(leaps)
+library(pROC)
+library(sfsmisc)
+```
+
+```{r, eval=TRUE, echo=TRUE}
+id <- "1HM1ytt-x9QkTHQu7bMvhBJSJWihzpZJ2" # google file ID
+d.heart <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+d.heart$HeartDisease <- as.factor(d.heart$HeartDisease)
+
+ 
+
+# 70% of the sample size for training set
+training_set_size <- floor(0.70 * nrow(d.heart))
+
+set.seed(4268)
+train_ind <- sample(seq_len(nrow(d.heart)), size = training_set_size)
+
+train <- d.heart[train_ind, ]
+test <- d.heart[-train_ind, ]
+```
+
+
+## a)
+```{r, eval=TRUE, echo=TRUE}
+r.glm <- glm(HeartDisease ~ BMI + Smoking + AlcoholDrinking + Sex + AgeCategory + Smoking:Sex + AlcoholDrinking:Sex, train, family = "binomial")
+summary(r.glm)
+```
+
+There is 12 age categories in this dataset
+
+## b)
+The purpose of this model can be both inference and prediction. We can use it to determine what variables that have a higher chance to cause Heart Disease, but we can also use it to predict the chance that a person given the variables will develop Heart Disease
+
+## c)
+```{r, eval=TRUE, echo=TRUE}
+linear <- lda(HeartDisease ~ ., train)
+summary(linear)
+quad <- qda(HeartDisease ~ ., train)
+summary(quad)
+
+predictedlin <- predict(linear, test, type="response")
+#auc(test$HeartDisease, predictedlin)
+
+predictedqua <- predict(quad, test, type="response")
+#auc(test$HeartDisease, predictedqua)
+```
+
+KNN classification probably wont work well for this task because KNN doesn't work well with large datasets and it doesn't work well with a high number of dimensions. The training dataset have 14000 observations with 17 variables. That is a LOT of data.
+
+## d)
+Not enought time to train trandomforest to find optimal number of tree, so i will use 1000 trees.
+I choose $mtry = p/3$ number of trees where $p$ is the number of predictors because that is the default for regression trees.
+
+```{r, eval=TRUE, echo=TRUE}
+bag.HeartDisease <- randomForest(HeartDisease ~ ., data = train, mtry = 4, ntree = 1000)
+bag.HeartDisease
+randompred <- predict(bag.HeartDisease, newdata = test)
+# randompred
+```

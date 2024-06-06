@@ -1,0 +1,453 @@
+---
+title: "Project 1"
+author: 'olarr@ntnu.no: 10031 ; tizianom@ntnu.no: 10006'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1
+
+## a)
+
+Let $Y \sim Poisson(\lambda)$ where
+
+$$y_i \; \underset{iid.}{\sim} \; Poisson(\lambda_i)$$
+
+The Canonical choice of link function for the Poisson distribution is $$
+\begin{aligned}
+ \eta_i &= g(\lambda_i) \\
+ &= log(\lambda_i) \\
+ &= X^T_i\beta
+\end{aligned}
+$$
+
+### Log-likelihood:
+
+The likelihood is given by:
+
+$$
+\begin{aligned}
+ L(\lambda) &= P(Y_1=y_1, ..., Y_n=y_n) \\
+ &= [y_i\text{'s are indep.}] \\
+ &= P(Y_1=y_1) \; \cdot \; ... \; \cdot \; P(Y_n=y_n) \\
+ &= \frac{\lambda_i^{-y_1}}{y_1!}e^{-\lambda_i} \; \cdot \; ... \; \cdot \; \frac{\lambda_i^{-y_n}}{y_n!}e^{-\lambda_i} \\
+ &= {\displaystyle \prod_{i=1}^{\infty}} \frac{\lambda_i^{-y_i}}{y_i!}e^{-\lambda_i}
+\end{aligned}
+$$
+
+Taking the log of the likelihood gives:
+
+$$
+\begin{aligned}
+ l(\beta) &= ln(L(\beta)) \\
+ &= ln({\displaystyle \prod_{i=1}^{\infty}} \frac{\lambda_i^{-y_i}}{y_i!}e^{-\lambda_i}) \\
+ &= \displaystyle\sum_{i=1}^{n}(y_iln(\lambda_i)-\lambda_i-ln(y_i!)) \\
+ &= \displaystyle\sum_{i=1}^{n}(y_iln(e^{\eta_i})-e^{\eta_i}-ln(y_i!)) \\
+ &= \displaystyle\sum_{i=1}^{n}(y_iln(e^{X^T_i\beta})-e^{X^T_i\beta}-ln(y_i!))
+\end{aligned}
+$$
+
+Because $y_i$ do not depend on $\beta_i$, we can omit $ln(y_i!)$ when finding the score function.
+
+### Score function:
+
+$$
+\begin{aligned}
+ s(\beta) &= \frac{\partial}{\partial\beta}l(\beta) \\
+ &= \frac{\partial}{\partial\beta}(\displaystyle\sum_{i=1}^{n}(y_iln(e^{x^T_i\beta})-e^{x^T_i\beta})) \\
+ &= \displaystyle\sum_{i=1}^{n}(y_ix_i-x_ie^{x^t_i\beta}) \\
+ &= \displaystyle\sum_{i=1}^{n}(y_i-e^{x^T_i\beta})x_i
+\end{aligned}
+$$
+
+### Observed Fisher information:
+
+$$
+\begin{aligned}
+H(\beta) &= -\frac{\partial^2}{\partial\beta \partial\beta^T}l(\beta) \\
+ &= -\frac{\partial}{\partial\beta}s^T(\beta) \\
+ &= -\displaystyle\sum_{i=1}^{n}\frac{\partial}{\partial\beta}((y_i-e^{x^T_i\beta})x_i^T) \\
+ &= \displaystyle\sum_{i=1}^{n}x_ix^T_ie^{x^T_i\beta} \\
+ &= X^TWX
+\end{aligned}
+$$
+
+where $W=diag(e^{X^T_1\beta},...,e^{X^T_n\beta})=diag(e^{\eta_1},...,e^{\eta_n})$
+
+### Expected Fisher information:
+
+$$
+\begin{aligned}
+F(\beta) &= Var[s(\beta)] \\
+ &= Var[\displaystyle\sum_{i=1}^{n}(y_i-e^{x^T_i\beta})x_i] \\
+ &= \displaystyle\sum_{i=1}^{n} x_i Var[y_i-e^{x^T_i\beta}] x^T_i \\
+ &= \displaystyle\sum_{i=1}^{n}x_iVar[y_i]x^T_i \\
+ &= \displaystyle\sum_{i=1}^{n}x_i\lambda_ix^T_i \\
+ &= X^TWX
+\end{aligned}
+$$
+
+where $W$ is the same as in the observed fisher information
+
+\newpage
+
+## b)
+
+```{r, eval=TRUE}
+myglm <- function(formula, data, start = 0) {
+   
+   # Defining y and X:
+   y <- data$y
+   X <- model.matrix(formula, data)
+   
+   # Defining beta:
+   beta_0 <- rep(start, ncol(X))
+   beta <- solve(t(X) %*% X) %*% t(X) %*% y
+   
+   # Fisher scoring algorithm:
+   while (TRUE) {
+     beta_0 <- beta
+     eta <- as.vector((X %*% beta))
+     scoreF <- t(X) %*% (y - exp(eta))
+     A <- diag(exp(eta))
+     fisherInf <- t(X) %*% A %*% X
+     
+     if (all(abs(scoreF) < 1e-04)) {
+       break}
+     
+     beta <- beta + solve(fisherInf) %*% scoreF
+   }
+   
+   # Deviance:
+   eta <- as.vector((X %*% beta))
+   yhat <- exp(eta)
+   deviance <- 2 * sum(dpois(y, y, TRUE) - dpois(y, yhat, TRUE))
+   
+   # Estimated variance matrix:
+   vcov <- solve(fisherInf)
+   
+   # Coefficients
+   coefficients <- matrix(, nrow = 3, ncol = 2)
+   colnames(coefficients) <- c("Estimate", "Std. Error")
+   rownames(coefficients) <- c("(Intercept)", "t^2", "t")
+   coefficients[,1] <- beta
+   coefficients[,2] <- sqrt(diag(vcov))
+   
+   return (list(coefficients = coefficients,deviance = deviance,vcov = vcov))
+}
+```
+
+\newpage
+
+## c)
+
+We now compare the "myglm" function to the built in "glm" and "vcov" functions in R: This will be done with the simulated data obtained from the "rpois" function.
+
+Data:
+
+```{r, eval=TRUE}
+set.seed(999)
+t1 <- c(16,15,17,18,15,14,16,17,18,15) # t^2
+t2 <- c(16,14,19,18,15,14,16,17,18,15) # t
+testData <- data.frame(y = rpois(10, 10),t1,t2) 
+```
+
+Our function:
+
+```{r, eval=TRUE}
+testOur <- myglm(y ~ ., testData)
+testOur
+```
+
+Built in functions:
+
+```{r, eval=TRUE}
+testBuilt <- glm(y ~ ., family = poisson(link = log), data = testData)
+
+summary(testBuilt)$coefficients
+
+summary(testBuilt)$deviance
+
+vcov(testBuilt)
+```
+
+We get the same results.
+
+\newpage
+
+# 2
+
+We are given a Poisson distribution with $\lambda_i=\lambda_0e^{\frac{-(t_i-\theta)^2}{2\omega^2}}$. $\lambda_i$ are the number of fledglings at time $i$ (number of days after April 1)
+
+## a)
+
+When $\theta = t_i$, the exponent of the $e$ is zero, so $\lambda_i = \lambda_0$. This means that $\lambda_0$ is the maximum expected number of fledglings leaving the nest when $t_i = \theta$.
+
+The $\omega$ determine the growth of the function. If it is large the function will decrease slower.
+
+The function reaches its maximum value when the exponent is 0, i.e $t_i = \theta$. This means that the $\theta$ is the optimal time for breeding.
+
+## b)
+
+This is a GLM because it is Poisson distributed.
+
+Know that $y \sim Poisson(\lambda_0e^{\frac{-(t_i-\theta)^2}{2\omega^2}})$
+
+$$
+\begin{aligned}
+ \lambda_i &= \lambda_0e^{\frac{-(t_i-\theta)^2}{2\omega^2}} \\
+ &= e^\eta \\
+ &= e^{x^T_i\beta}
+\end{aligned}
+$$
+
+Taking ln on both sides:
+
+$$
+\begin{aligned}
+ x^T_i\beta &= ln(\lambda_0) - \frac{(t_i-\theta)^2}{2\omega^2} \\
+ &= ln(\lambda_0) - \frac{1}{2}(\frac{t^2_i}{\omega^2} - \frac{2t_i\theta}{\omega^2} + \frac{\theta^2}{\omega^2}) \\
+ &= ln(\lambda_0) - \frac{\theta^2}{2\omega^2} + \frac{\theta}{\omega^2}t_i - \frac{1}{2\omega^2}t^2_i \\
+ &= \beta_0 + \beta_1t + \beta_2t^2
+\end{aligned}
+$$
+
+So
+
+$$
+\begin{aligned}
+ \beta_0 &= ln(\lambda_0) - \frac{\theta^2}{2\omega^2} \\
+ \beta_1 &= \frac{\theta}{\omega^2} \\
+ \beta_2 &= \frac{1}{2\omega^2}
+\end{aligned}
+$$
+
+\newpage
+
+## c)
+
+```{r, eval=TRUE}
+load(url("https://www.math.ntnu.no/emner/TMA4315/2022h/hoge-veluwe.Rdata")) # Defaults to "data"
+
+testOur <- myglm(y ~ I(t^2) + t, data)
+testOur
+
+# Just to check if it works on this data aswell
+# testBuilt <- glm(y ~ I(t^2) + t, family = poisson(link = log), data)
+# summary(testBuilt)
+# vcov(testBuilt)
+```
+
+We see that:
+
+$$
+\hat{\beta_0} = 1.42, \ \ \ \ \ \ \ \ \hat{\beta_1} = 0.085, \ \ \ \ \ \ \ \ \hat{\beta_2} = -0.0033
+$$
+
+## d)
+
+To test if there is a quadratic effect of t (at a 0.05-level of significance), we test
+
+$$
+H_0: \hat{\beta}_2 = 0 \ \ \ \ vs \ \ \ \ H_1: \hat{\beta}_2 \ne 0
+$$ using the Wald-test.
+
+The test statistic under $H_0$ is then: $z = \frac{\hat{\beta}_2}{\hat{\sigma}_{\beta_2}} \sim N(0,1)$, where $\hat{\sigma}_{\beta_2}$ is the estimated standard deviation. At a 0.05-level of significance, $H_0$ is rejected if $|z|>1.96$.
+
+Testing:
+
+```{r, eval=TRUE}
+z = testOur$coefficients[2,1] / (sqrt(testOur$vcov[2,2]))
+
+# z-value from Wald-test
+abs(z)
+```
+
+Here we see that $H_0$ is rejected, so this indicates that there is in fact a quadratic effect of $t$ (at a 0.05-level of significance)
+
+\newpage
+
+## e)
+
+We have that the deviance for our model is $277.4613$. To test if this model is OK, we have the test:
+
+$$
+H_0: \ model \ ok \ \ \ \ \ \ \ \ vs \ \ \ \ \ \ \ \ H_1: \ model \ not \ ok
+$$
+
+Under $H_0$, the deviance is approx. $\chi^2_{n-p}$, where $n$ is the amount of observations and $p$ is the number of parameters.
+
+In our case, $n = 135$ and $p = 3$, and $H_0$ is then rejected if $D > \chi^2_{0.95,n-p}$
+
+```{r, eval=TRUE}
+criticalValue <- qchisq(0.95, dim(data)[1] - length(testOur$coefficients[,1]))
+criticalValue
+```
+
+We see that our deviance is larger than the critical value, so our model is probably not the best fit for our data.
+
+Our assumptions for $y$ is that it is Poisson distributed. Looking at the observed density and the poisson distribution given :
+
+```{r, eval=TRUE}
+hist(data[,1], freq=F, main = "Histogram of y", xlab = "y")
+lines(x = seq(0,20), dpois(x = seq(0,20), lambda = mean(data$y)), col="pink", lwd = 4)
+```
+
+Here the pink line is $Poisson(\lambda = \bar{y})$ and the bar-plot is the density of our data. Looking at this histogram we see that the assumption that $y$ is Poisson distributed does not hold.
+
+\newpage
+
+## f)
+
+We see from 2b) that
+
+$$
+\hat{\beta_1} = \frac{\theta}{\omega^2}, \ \ \ \ \ \ \ \ \hat{\beta_2} = \frac{1}{2\omega^2}
+$$
+
+This can be made into: $$
+\hat{\omega} = \sqrt{\frac{1}{2\hat{\beta}_2}} \ \ \ \ \ \ \ \ and \ \ \ \ \ \ \ \ \hat{\theta} = \hat{\beta}_1\hat{\omega}^2
+$$
+
+Delta method is the following:
+
+For omegas $$
+\begin{aligned}
+Var[\hat{\omega}]&=(\frac{\partial\hat{\omega}}{\partial\hat{\beta}_2})^2 \ Var[\hat{\beta}_2]  \\
+ &=(-\frac{1}{2\sqrt{2\hat{\beta}_2^3}})^2 \ Var[\hat{\beta}_2]
+\end{aligned}
+$$
+
+Using this, the standard error for the omegas is then given by $SE[\hat{\omega}] = \sqrt{Var[\hat{\omega}]}$
+
+For thetas
+
+$$
+\begin{aligned}
+Var[\hat{\theta}] &= (\frac{\partial \hat{\theta}}{\partial\hat{\beta}_1})^2 \ Var[\hat{\beta}_1] \ + (\frac{\partial\hat{\theta}}{\partial\hat{\beta}_2})^2 \ Var[\hat{\beta}_2] \ + 2 \ (\frac{\partial\hat{\theta}}{\partial\hat{\beta}_1}) \ (\frac{\partial\hat{\theta}}{\partial\hat{\beta}_2}) \ Cov[\hat{\beta}_1,\hat{\beta}_2] \\
+ &= (\frac{1}{2 \hat{\beta}_2})^2 \ Var[\hat{\beta}_1] \ + (-\frac{\hat{\beta}_1}{2\hat{\beta}_2^2})^2 \ Var(\hat{\beta}_2) \ + 2 \ (\frac{1}{2\hat{\beta}_2}) \ (-\frac{\hat{\beta}_1}{2\hat{\beta}_2^2})^2 \ Cov[\hat{\beta}_1, \hat{\beta}_2]
+\end{aligned}
+$$
+
+Using this, the standard error for the thetas is then given by $SE[\hat{\theta}] = \sqrt{Var[\hat{\theta}]}$
+
+```{r, eval=TRUE}
+omegaHat <- sqrt(abs(1/(2*testOur$coefficients[2,1])))
+thetaHat <- omegaHat^2 * testOur$coefficients[3,1]
+cat("omega hat:", omegaHat, "theta hat:", thetaHat)
+
+omegaHat_var <- (-1/(2 * sqrt(abs(2 * testOur$coefficients[2,1]^3))))^2 * testOur$vcov[2,2]
+omegaHat_se <- sqrt(omegaHat_var)
+
+thetaHat_var <- (1/(2*testOur$coefficients[2,1]))^2*testOur$vcov[3,3] + ((testOur$coefficients[3,1])/(2*testOur$coefficients[2,1]^2))^2 * testOur$vcov[2,2] + 2*(((1/(2*testOur$coefficients[2,1])) * (- testOur$coefficients[3,1]/(2*testOur$coefficients[2,1]^2)) * testOur$vcov[2,3]))
+thetaHat_se <- sqrt(thetaHat_var)
+
+cat("SE of omega:", omegaHat_se, "SE of theta:", thetaHat_se)
+```
+
+We get
+
+$$
+\hat{\omega} = 12.31175 \ \ \ \ \ \ \ \ and \ \ \ \ \ \ \ \ \hat{\theta} = 12.91197
+$$
+
+and
+
+$$
+SE[\hat{\omega}] = 1.902526 \ \ \ \ \ \ \ \ and \ \ \ \ \ \ \ \ SE[\hat{\theta}] = 1.609386
+$$
+
+\newpage
+
+## g)
+
+From point $2.f$ we know that the estimate of the optimal breeding time $\hat\theta$ is 12.91. Instead, looking at the data we can easily compute the mean value of the breeding dates (i.e. by extracting data\$t) that is equal to 15.937. This difference can be interpreted as the result of a faster globally environmental change on the weather and a faster increase in temperature in the spring months compared to the evolutionary response. <br> According to this intuitive idea, we can make a test in order to verify if the mean value of t is significantly different from the estimated optimal date based on the fitted model. So, we define a new variable $\hat z=\mu-\hat\theta$, where $\mu$ is the mean value of the column representing the breeding times and $\hat\theta$ is the same item as above. <br> We can proceed with the test:      $H_0: \hat z=0 \ \ \ \ \ \ vs \ \ \ \ \ \ H_1: \hat z \not=0$ <br> Taking into account the assumption of gaussianity of $\hat z$ we can use the Z-test under $H_0$. We then have
+
+$$
+\begin{aligned}
+Z \ = \ \frac{\hat z}{\hat{\sigma}_z}
+\end{aligned}
+$$
+
+with  $Z$ \~  $N(0,1)$. As regards the computation of $\hat{\sigma}_z$ we need an extra hypothesis, we assume that $\mu$ and $\hat{\theta}$ are independent, so from basic theory of statistic we know that:
+
+$$
+\begin{aligned}
+\hat{\sigma}_z= \ \sqrt{Var[\mu] \ + \ Var[\hat{\theta}]}
+\end{aligned}
+$$
+
+From this equation we can find the value of our statistic:
+
+```{r eval=TRUE}
+mu = mean(data$t)
+n = nrow(data)
+var_mu = var(data$t)/n
+std_err = sqrt(var_mu + thetaHat_var)
+Z_val = (mu - thetaHat) / std_err
+Z_val
+```
+
+That is $Z \ =1.821$. It is known that for a test with $0.05$ significance level the null hypothesis is rejected for a value of $|Z| > 1.96$. Hence we do not have evidence to reject $H_0$ and to assert that there exist a significant difference between $\mu$ and $\hat\theta$.
+
+\newpage
+
+## h)
+
+```{r, eval=TRUE}
+set.seed(999)
+
+lambda <- function(t, thetaHat, c){
+   exp(testOur$coefficients[1,1] + (thetaHat^2)/(2 * omegaHat^2)) * exp(-((t - thetaHat)^2)/(2 * omegaHat^2))
+}
+
+B = 1000
+
+bootpred <- rep(NA, B)
+beta0s <- rep(NA,B)
+beta1s <- rep(NA,B)
+beta2s <- rep(NA,B)
+
+for (i in 1:B){
+   lambdab <- mapply(lambda, data$t, thetaHat, omegaHat)
+   y <- rpois(nrow(data), lambdab)
+   data_new <- data.frame(y,data$t)
+   names(data_new)[2] <- "t"
+   testOur_new <- myglm(y ~ I(t^2) + t, data_new)
+   beta0s[i] <- testOur_new$coefficients[1,1]
+   beta1s[i] <- testOur_new$coefficients[3,1]
+   beta2s[i] <- testOur_new$coefficients[2,1]
+}
+
+betabootstrap <- t(cbind(var(beta0s), var(beta2s), var(beta1s)))
+colnames(betabootstrap) <- c("Variance")
+rownames(betabootstrap) <- c("(intercept) bootstrap", "I(t^2) bootstrap", "t bootstrap")
+betabootstrap
+```
+
+Comparing this result to the variances obtained from 2c):
+
+```{r, eval=TRUE}
+betaOur0 <- testOur$vcov[1,1]
+betaOur2 <- testOur$vcov[2,2]
+betaOur1 <- testOur$vcov[3,3]
+
+betaOur <- t(cbind(betaOur0, betaOur2, betaOur1))
+colnames(betaOur) <- c("Variance")
+rownames(betaOur) <- c("(intercept)", "I(t^2)", "t")
+betaOur
+```
+
+Calculating the differences:
+
+```{r, eval=TRUE}
+diff <- abs(betaOur - betabootstrap)
+rownames(diff) <- c("diff (intercept)", "diff I(t^2)", "diff t")
+colnames(diff) <- c("Difference")
+diff
+```
+
+We see that we get pretty similar results.

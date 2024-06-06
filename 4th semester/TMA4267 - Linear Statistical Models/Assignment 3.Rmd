@@ -1,0 +1,13 @@
+1.
+  We want to find out how much time it takes to boil a set amount of water.
+  
+  This is interesting because boiling water is something many do every week, and when someone get home from a long day of work, it would be beneficial to spend the least amount of time boiling the water.
+  
+  We know that normal water boils at $100^{\circ}C$.
+  
+  What we want to achive is to find the fastest way to boil water.
+
+2.
+  The factors we consider to be relevant to the problem is salt, lid on or off, and pot size.
+  
+  __INTERACTION ????__

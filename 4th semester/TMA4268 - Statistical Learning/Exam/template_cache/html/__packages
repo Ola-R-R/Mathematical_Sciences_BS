@@ -1,0 +1,16 @@
+knitr
+MASS
+keras
+ggplot2
+lattice
+caret
+pls
+Matrix
+glmnet
+foreach
+gam
+gbm
+randomForest
+ggfortify
+leaps
+pROC

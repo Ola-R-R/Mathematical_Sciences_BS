@@ -1,0 +1,119 @@
+---
+title: "Assignment 2"
+author: "Ola Rasmussen"
+output:
+  html_document:
+    fig_height: 7
+  word_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+## Problem 1
+
+a.  
+
+    1.  
+
+        -   Estimate: $\hat\beta = (X^TX)^{-1}X^TY$
+        -   Std. Error: $\dfrac{\sigma}{\sqrt{n}}$
+        -   T-value: $T = \dfrac{Estimate}{Std. Error}$
+        -   Pr(\>\|t\|): $P-value(t)=P(T\geq t)$
+        -   $Y = X\beta+\epsilon$ is a quantitative measurement of disease progression one year after baseline.
+        -   $n$ is the number of observations and $\sigma$ is standard deviation.
+
+    2.  Estimate of the intercept we interpret is at $\hat\beta_0$. We get this when all the other covariates are zero.
+
+    3.  When the bmi covariate increases by 1, the Y-value increases by 5.59548.
+
+    4.  Residual standard error: 54.16 on 431 degrees of freedom.
+
+        The formula is: $\dfrac{1}{n}\sum_{i=1}^\infty(Y_i - \hat Y_i)^2$
+
+    5.  With a significant level at 0.05 we would consider sex, bmi, map and ltg so be significant.
+
+        $H_0: p-value_{covariate}\leq\alpha$
+
+        versus
+
+        $H_1: p-value_{covariate}>\alpha$
+
+        For the p-value to be valid, we need to assume that the null-hypothesis is correct.
+
+b.  I would say that the fit of the full model is OK. The adjusted R-squared value is about 0.5, and since humans are hard to predict, that is a good adjusted R-squared value.
+
+    Less than half of the null-hypotheses are rejected, so i would not say that the model is significant at level $\alpha = 0.05$.
+
+    $H_0: \beta_{age} = \beta_{sex} =\beta_{bmi} =\beta_{map} =\beta_{tc} =\beta_{ldl} =\beta_{hdl} =\beta_{tch} =\beta_{ltg} =\beta_{glu} = 0$
+
+    versus
+
+    $H_1:$ at least one $\ne 0$
+
+    Multiple R-squared is a measurement for the fit of the model. The value 0.5176 means that the full model explains roughly 50% of the data.
+
+c.  A reduced model can have a better performance than a full model because it might reduce overfitting when we want to predict the future.
+
+    In the best subset model selection, all the possible combinations of the independent variables are considered. They are tested by some criterion.
+
+    Some of these criterion are adjusted R-squared and Bayesian Information Criterion (BIC).
+
+    Adjusted R-squared is used because it includes a correction term for the number of parameters. The bigger the better.
+
+    BIC introduces a penalty term for the number of parameters. The lower the better.
+
+    Based on the results of the adjusted R-squared and the BIC criteria, I choose model 6. It has the second lowest BIC value while also having the second highest adjusted R-squared value. The other contenders are model 5 and 7. Model 5 has a much lower adjusted R-squared value and model 7 has a much higher BIC value.
+
+    ```{r echo=TRUE, eval=TRUE}
+    ds <- read.csv("https://web.stanford.edu/~hastie/CASI_files/DATA/diabetes.csv", sep = ",")
+    model6 <- lm(prog ~ sex + bmi + map + tc + ldl + ltg, data = ds)
+    summary(model6)
+    ```
+
+    Comparing Model 6 with the full model we observe that the adjusted R-squared value has increased, implying that the model fit more to the data. We also observe that all of the null-hypotheses are rejected, which means that the model is significant.
+
+d.  Test:
+
+    $H_0: \beta_{age} = \beta_{tc} =\beta_{ldl} =\beta_{tch} =\beta_{glu} = 0$
+
+    versus
+
+    $H_1:$ at least one $\ne 0$
+
+    ```{r echo=TRUE, eval=TRUE}
+    ds <- read.csv("https://web.stanford.edu/~hastie/CASI_files/DATA/diabetes.csv", sep = ",")
+    reduced <- lm(prog ~ age + tc + ldl + tch + glu, data = ds)
+    summary(reduced)
+    ```
+
+    We can see that the adjusted R-squared value has drastically gone down, so i would prefer the full model of this reduces model.
+
+## Problem 2
+
+a.  
+
+    ```{r echo=TRUE, eval=TRUE}
+    pvalues <- scan("https://www.math.ntnu.no/emner/TMA4267/2018v/pvalues.txt")
+    sum(pvalues < 0.05)
+    ```
+
+    We reject 155 null-hypotheses.
+
+    A type 1 error occurs when we reject a null-hypothesis when said null-hypothesis is true.
+
+    We do not know the number of false positive findings in out data, but we can assume it given $\alpha = 0.05$
+
+b.  The familywise error rate (FWER) is defined as the probability of one or more false positive findings.
+
+    Controlling the FWER at level 0.05 means that we set an upper limit to the FWER. That is we set a cut-off on the p-value.
+
+    Given $\alpha = 0.05$ and $m = 1000$, we want the cut-off on p-values to be $\alpha_{loc} = \dfrac{\alpha}{m} = \dfrac{0.05}{1000} = 0.00005$ for out data using the Bonferroni method.
+
+    ```{r echo=TRUE, eval=TRUE}
+    pvalues <- scan("https://www.math.ntnu.no/emner/TMA4267/2018v/pvalues.txt")
+    sum(pvalues < 0.00005)
+    ```
+
+    Using the Bonferroni method with $\alpha_{loc} = 0.00005$, we reject 50 null-hypotheses.
+
+c.  Assuming that the first 900 null-hypotheses are true ant the last 100 are false, it implies that 10% of the number of type 1 and type 2 errors are false.

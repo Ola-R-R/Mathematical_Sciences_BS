@@ -1,0 +1,183 @@
+---
+subtitle: "TMA4267 Linear Statistical models"
+title: "Compulsory exercise 3"
+author: "(Martin Hallin Ekman, Ola Rasmussen, Martinius Singdahlsen)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document
+  #pdf_document
+---
+  
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=FALSE, size="scriptsize",fig.width=4, fig.height=3,fig.align = "center")
+```
+
+```{r,eval=TRUE,echo=FALSE}
+# install.packages("knitr") #probably already installed
+# install.packages("rmarkdown") #probably already installed
+# install.packages("ggplot2") #plotting with ggplot
+# install.packages("ggfortify") # For model checking
+# install.packages("MASS")
+# install.packages("class")
+# install.packages("pROC")
+# install.packages("plotROC")
+# install.packages("boot")
+library("knitr")
+library("rmarkdown")
+
+library("readxl")
+library(FrF2)
+
+library(ggplot2)
+library(ggfortify)
+library(palmerpenguins)
+library(GGally)
+
+library(nortest)
+```
+
+```{r}
+#Loading data
+kokevann <- read_excel("C:\\data\\kokevann.xlsx")
+dat_f <- as.data.frame(kokevann)
+#summary(kokevann)
+#head(kokevann)
+
+plan <- FrF2(nruns=8, nfactors=3, replications = 2, randomize=FALSE)
+y <- c(102.61,95.8,94.26,88.09,120.34,101.29,85.63,92.38,96.91,103.6,95.23,96.1,107.32,102.6,109.51,94.16)
+komvann <- add.response(plan, y)
+```
+
+## Issues to be addressed
+For our experiment we want to find out how much time it takes to boil a set amount of water given the effects of different factors. This is interesting because boiling water is something many do every week. Usually this is related to cooking and in regular everyday use, it would be beneficial to spend the least amount of time boiling the water.
+
+We know that the boiling point for distilled water is $100^{\circ}C$ at 1 atm. We first want to point out that minimizing energy loss will make the water warm up faster such that the boiling point will be reached faster.
+
+Dissolving a substance like salt increases the boiling point, however at the same time it also increases the enthalpy of vaporization (energy needed for the liquid to vaporize). Therefore by adding salt we observe less energy loss which contributes to the water being warmed up faster. If we only look at the factor of how fast the water is being warmed up it is clear that it will result in reaching its boiling point faster. By adding some sort of air tight cover it will increase the boiling point because of the pressure that builds up inside the pot from the the energy being kept inside. On the other side a lid also contributes to less energy loss. It has to be mentioned that most lids are not air tight and therefore does not create a pressure. It is worth noting that there are a lot of different types of salt that you can find that will effect an experiment differently.
+
+What we want to achieve is to find the optimal factors when boiling water for everyday use. It is not as easy as finding out what factors contribute the water to boil the fastest. This is because when cooking food we are also interested in taste. As an example when adding salt before it boils changes the taste of the dish. However by preforming this experiment we get an insight in one key part of cooking food and that is efficiency.
+
+## Selection of factors and levels
+There are multiple factors we consider to be relevant to the problem. These include the induced flux, temperature of the water, temperature of the pots, conductivity of the materials and surface area, dissolving a substance, air humidity, pressure and if a cover to keep the energy is being used. In this experiment we will only focus on dissolving a substance, cover to prevent energy loss and surface area. This will be in the form of salt, a lid and different pot sizes. This is because we see these factors as being the most commonly used when cooking.
+
+It is hard to say whether we will observe some interactions. However we might observe an interaction between salt and pot size. This may be because the surface area of the water to air changes as well as the enthalpy of vaporization changes with pot size and salt, respectively. Therefore when we have salt and a huge pot we might observe that the water loses less energy. So since they might have a combined effect we might see an interaction between them.
+
+In this experiment we will use 3 dl of water, this is to have an easily measured amount. Before the experiment was preformed we boiled different amounts of water without salt, lid and the small pot. This was to make sure that it would take at least one minute until it boils. When it came to choosing the amount of salt we choose to have the factor level being no salt and 15 grams of "Maldon" sea salt. The reason for this is that we believe having a small amount of salt when cooking will not make a significant difference. Therefore we choose to use approximately as much salt as it is in saltwater. We had 4.8% salt while in seawater there is approximately 3.5% salt however it can greatly vary. The second factor level was a lid on or a lid of. Lids are often used when cooking so it is a relevant factor. Finally the small and large pot sizes was 12.8 cm and 16.7 cm in diameter and the pots have a volume of 15 dl and 32 dl, respectively. The reason we chose these was simply as a result of them being available and them being commonly used.
+
+All the the measures we will implement bellow is to keep the factors discussed at the desired level even if we do not measure them in this experiment.
+
+To make sure the water is at the same temperature when pouring water into the pots we will measure the temperature of the water before each experiment. In this experiment it is also important to use the same amount of water, therefor we will use a beaker to measure the amount before each trial. We will measure the salt with a scale to be as accurate as we possibly can be. One factor discussed was the temperature of the pots. To make sure the temperature of these pots are constant we will always boil water in them even though an experiment is not being preformed. The pots will also boil water before the experiment starts. We will make these measures to keep the pots hot at all times. The same person will do all the measurements, this is to focus on having genuine run replicates.
+
+## Selection of response variable 
+For our response variable y we chose to look at the time it took until the water was visibly boiling. The definition of something boiling is when the liquid reaches a boiling point where the liquid rapidly vaporizes and turns from a liquid form to a gas form. For our more mundane use of the boiling water this would be a closer approximate to what daily use definition of boiling would be. Measuring the temperature when boiling water for cooking purposes is not as common as just going by looks. The picture given below is how much bubble formation we are aiming for.
+
+```{r}
+library("jpeg")
+setwd("C:\\data\\")
+jj <- readJPEG("bildekoke.jpg",native=TRUE)
+plot(0:1,0:1,type="n",ann=FALSE,axes=FALSE)
+rasterImage(jj,0,0,1,1)
+```
+
+
+Another possible response variable for this kind of experiment would be looking at the temperature of the water. However that would not be precise as the boiling temperature of the water would be affected by outside factors such as pressure and as one of our factors is salt, we also know that salted water would have a different boiling temperature than regular water.  
+
+  We used a phone to measure how long the water took to reach a boil. Due to being students we do not have access to equipment that could automate starting and stopping the timer and as such there is a degree of human error that could affect the outcome of our testing. The accuracy would also be affected by certain factors that we could not perfectly control and factor in. External factors that affect the boiling point of water would be factors like room temperature, atmospheric pressure and similar factors we did not have the ability to control. 
+
+## Choice of design
+For our design we chose a $2^{k}$ factorial design with k=3. This is a full factorial design with all interactions. As this is a full factorial design it has no confounding and desired resolution would be III. Due to our low number of variables we chose to do the experiment with two replications so we ended up with 16 measured responses, 8 from each replication. With this design we do not need to use any strategies to calculate the coefficients as the estimator from the multiple linear regression model can be used. With this design we wish to look at what variables makes for the optimal water boiling. 
+
+When it comes to blocking we don't consider there to be enough variance induced by external factors for there to be a need to use blocks in our experiment. We also have not come up with the factors that have varied variance during this experiment and been able to classify them in different blocks. One example of an external factor that we could block is pressure. However the experiment was done in a span of one hour where the whether was similar and we do not have the equipment to measure pressure.
+
+We used the same equipment for all experiments as well as using the same measurements measured with the same measuring tools. The experiments were all done by a single member of the group with all being done in order without breaks for the highest possible consistency throughout.
+
+The experiment was preformed in this way. The equipment we had on hand was salt, weight, 1L beaker, cup, 2 pots and corresponding lids, bucket and two spoons to stir with. We had boiling water in both pots on separate plates (to keep the pots warm). First we would switch the pots such that the pot that was going to be used was on the right plate. This is to prevent it from being to hot from the larger plate used to keep the pots warm and ready. Before preforming each trial we would stir the water and then measure the temperature. We stir to make sure the water has the same temperature at every point. Then we would use the cup to pour water into the beaker and measure 3 dl. If we ended up with to much water in the beaker it would be poured in the sink. At this point if salt was a factor we would add salt into the beaker and stir for 3 seconds with a different spoon. Furthermore the boiling water in the pot would be poured out and we would pour our measured water add a lid if that was a factor. This would all be done by one person however a second person had responsibility for starting and ending the timer. After the timer was stopped the lid would be removed and we would rinse the pot with boiling water if we had salt as a factor. Then we would wait at least two minutes to make sure that the pot was warmed up.
+
+## Implementation of the experiment
+To randomize the order of what factor levels we used in our experiment we used the function FrF2 in the package FrF2. This gave us the order for three factors and two run replicates. The order with the observed values are given in the table below.
+
+```{r}
+kokevann
+```
+
+After preforming the experiment we have arrived at two possible bias that may have skewed the results of this experiment. 
+
+The first one has to do with the fact that we have used salt as a factor. When having salt in the water was a factor we would pour the water in the measure cup and add salt and stirred in the same measure cup. This same measure cup was then used through out the whole experiment. Even though the measure cup was rinsed out with water there might still have been some amount of salt left in the measure cup.
+
+A solution to this problem that is really easy to implement would be to have two separate  measure cups. This way only one would be used when salt was a factor such that the other one would not be polluted by salt.
+
+In this experiment we tried to hold the pots at a constant temperature by always boiling up water in them even though they were not in use. It might be that the pots were not totally warmed up.
+
+It is possible that the temperature of the pots significantly varied throughout the experiment. Some explanation for this may be because of cleaning the pots to get rid of salt or variability in time used between trials.
+
+We think that the biggest cause for error in this experiment was the human error involved in deciding when the water had reached what we considered to be boiling. This was not as easy as first thought because you have to yourself decide when you see enough bubbles. Furthermore the two different factors salt and lid made it harder to determine when there was the right amount of bubbles. The lid had the problem that condensation from the water made it hard to see through the lid of the pot. This might have greatly influenced the outcome of the model and as we soon will see the lid factor is the only factor significant to our model. The salt that was visible in the water may have given the impression that the water was boiling more than we thought and therefore skewing the outcome.
+
+As we followed through with each trial and made sure that the circumstances were the same for each trial we conclude that each trial was a genuine run replicate.
+
+## Analysis of data
+```{r}
+model_1 <- lm(data = kokevann,Time~.^3)
+model_1$coeff*2
+```
+
+Listed above are the effects of the model and the intercept multiplied with two. The Intercept is $99.11$ and tells us that the mean time it took to boil the water was $99.11$ seconds.
+
+Bellow are some illustrations to get a better view of the effects. The first plot is a simple plot showing the the main effects.
+
+```{r}
+MEPlot(model_1)
+```
+
+As we can see the effect of lid is the greatest with a value of $-9.39$. It is also negative which tells us that when a lid was used the time to boil decreased. Pot and salt have approximately the same value $5$ however pot is positive while salt is negative.
+
+Below is a plot that visualizes the interactions between the different factors. The only interaction factor that is not included is the interaction between all three factors. This plot visualizes how much interaction there is between factors depending on how parallel the lines are, where parallel lines indicate low interaction, and non-parallel lines indicate greater interaction.
+
+```{r}
+IAPlot(model_1)
+```
+
+We can see that the factors salt and lid are almost totally parallel while interactions between pot and lid together with pot and salt are does not seem to be as parallel. This is reflected by the table above where the salt and lid interaction is $1.24$ while pot and lid together with pot and salt have approximately a value of $-3$. The interaction effect between all factors are $2.54$.
+
+When looking at the interaction effects we can observe that they are all lower than the non interaction terms. We will now look at the summary of the model to see which effects are significant or not.
+
+Below is the model fitted to the data where A, B and C represent the factor levels salt, lid and pot, respectively.
+
+$$ \widehat{y}=\widehat\beta_{0}+\widehat\beta_{A}x_{A}+\widehat\beta_{B}x_{B}+\widehat\beta_{C}x_{C} +\widehat\beta_{AB}x_{A}x_{B}+\widehat\beta_{AC}x_{A}x_{C}+\widehat\beta_{BC}x_{B}x_{C} + \widehat\beta_{ABC}x_{A}x_{B}x_{C} $$
+
+```{r}
+summary(model_1)
+```
+
+Looking at the summary of the model we get a different picture of how the experiment went. The only two coefficients that are significant (p-value below 0.05) are the intercept and main factor lid. However looking at the f-test testing whether all coefficients are equal to zero gives fail to reject with a p-value of 0.243. This tells us that we have not picked up enough variance to explain the response and that the data collected does not seem to predict the response. Furthermore we have an R-squared adjusted value that is as low as 0.2386. when R-squared adjusted is low it tells us that our factors do not explain the response well.
+
+<br>
+<br>
+<br>
+<br>
+<br>
+
+```{r}
+#autoplot(model_1)
+plot(model_1$fitted,rstudent(model_1))
+```
+
+Looking at the residuals of the model the residual are centered exactly around zero mean. However this is expected when running two run replicates as the average of the response of the factors are found. Homoscedasticity of the model seem to be satisfied and the only noteworthy is data point number 11 and 7 as their error is larger than the rest. These two runs are with lid, big pot and without salt.
+
+```{r}
+plot(model_1, which=c(2))
+```
+
+The Q-Q plot tells us whether normality of the model is satisfied and by visual investigation the Q-Q plot looks to follow the identity quite well which supports that normality of the residuals are satisfied. However we can see a weird pattern where it seems that the data points seem to not be a smooth line, but a ridged one.
+
+```{r}
+ad.test(rstudent(model_1))
+```
+
+When preform the Anderson-Darling normality test on the data set we get a p-value of 0.03665. The $H_{0}$ hypothesis is that the residuals are normal distributed while the $H_{1}$ hypothesis is that they are not. The hypothesis test tells us that there is reason to believe that the residuals are not normally distributed witch is one of the assumptions of this model.
+
+## Conclusion and recommendations
+We have observed that there is reason to suspect that the normality of the model is not maintained and the f-test tells us that there is not enough evidence to support that at least one of the coefficients are different from zero. It is therefore clear that we do not have a model that can predict or explain anything.
+
+However we have observed that trying to measure when water boils by visually looking for a collection of bubbles does not work. This experiment would probably have been easier if we looked for just one bobble or if we found another response to measure. One example is the closely related response temperature. This way we may have had any results to present.

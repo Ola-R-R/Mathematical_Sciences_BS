@@ -1,0 +1,83 @@
+"0","knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, fig.align = ""center"", tidy.opts = list(width.cutoff = 60))"
+"0",""
+"0","library(""tidyverse"")"
+"2","── [1mAttaching core tidyverse packages[22m ─────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.0     [32m✔[39m [34mreadr    [39m 2.1.4
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.0
+[32m✔[39m [34mggplot2  [39m 3.4.1     [32m✔[39m [34mtibble   [39m 3.2.0
+[32m✔[39m [34mlubridate[39m 1.9.2     [32m✔[39m [34mtidyr    [39m 1.3.0
+[32m✔[39m [34mpurrr    [39m 1.0.1     "
+"2","── [1mConflicts[22m ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the ]8;;http://conflicted.r-lib.org/conflicted package]8;; to force all conflicts to become errors"
+"0","library(""aod"")"
+"0","library(""lmtest"")"
+"2","Loading required package: zoo
+"
+"2","
+Attaching package: ‘zoo’
+
+"
+"2","The following objects are masked from ‘package:base’:
+
+    as.Date, as.Date.numeric
+
+"
+"0","library(""readxl"")"
+"0","library(""VGAM"")"
+"2","Loading required package: stats4
+"
+"2","Loading required package: splines
+"
+"2","
+Attaching package: ‘VGAM’
+
+"
+"2","The following object is masked from ‘package:lmtest’:
+
+    lrtest
+
+"
+"0","library(""broom"")"
+"0","library(""ggfortify"")"
+"0","library(""MASS"")"
+"2","
+Attaching package: ‘MASS’
+
+"
+"2","The following object is masked from ‘package:dplyr’:
+
+    select
+
+"
+"0","library(""dampack"")"
+"0","library(""mdscore"")"
+"2","
+Attaching package: ‘mdscore’
+
+"
+"2","The following object is masked from ‘package:aod’:
+
+    wald.test
+
+"
+"0","library(""formatR"")"
+"0","library(""glmmTMB"")"
+"2","
+Attaching package: ‘glmmTMB’
+
+"
+"2","The following object is masked from ‘package:VGAM’:
+
+    betabinomial
+
+"
+"0","library(""TMB"")"
+"0","library(""stringr"")"
+"0","library(""pals"")"
+"0","library(""teamcolors"")"
+"0","library(""corrplot"")"
+"2","corrplot 0.92 loaded
+"
+"0","library(""lmtest"")"

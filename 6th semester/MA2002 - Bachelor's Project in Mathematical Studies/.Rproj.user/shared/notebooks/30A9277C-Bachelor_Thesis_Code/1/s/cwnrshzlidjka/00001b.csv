@@ -1,0 +1,5 @@
+"0","rf.mod.OU.F <- ranef(mod.OU.F)"
+"0","one_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(1,by = 3,length.out = 30),]"
+"0","two_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(2,by = 3,length.out = 30),]"
+"0","thr_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(3,by = 3,length.out = 30),]"
+"0","plot(1:ncol(one_p_A.OU.F),one_p_A.OU.F[1,], col = league_pal(""nba"")[1],type=""l"",ylim=c(-.6,.6), xlab = ""Days after 27.10.14 while the season is active"",ylab="""")"

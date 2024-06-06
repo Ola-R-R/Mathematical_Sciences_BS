@@ -1,0 +1,96 @@
+---
+title: "TMA4265 Stochastic Modelling: Exercise 2"
+author: "Week 35"
+output: pdf_document
+header-includes:
+  - \geometry{top=1in}
+  - \usepackage{titling}
+  - \pretitle{\begin{flushleft}\Huge\bfseries}
+  - \posttitle{\end{flushleft}}  
+  - \preauthor{\begin{flushleft}\Large}
+  - \postauthor{\end{flushleft}}  
+  - \predate{\begin{flushleft}\large}
+  - \postdate{\end{flushleft}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 1
+Consider the Markov chain $\{X_n : n=0,1,2,...\}$ with state space $\Omega=\{\mathrm{A},\mathrm{B},\mathrm{C}\}$ and transition probability matrix given by
+$$
+	\textbf{P} = \bordermatrix{~ & \mathrm{A} & \mathrm{B} & \mathrm{C} \cr
+	\mathrm{A} & 0.1 & 0.7&0.2 \cr
+	\mathrm{B} & 0.5 & 0.1& 0.4 \cr
+	\mathrm{C} & 0.3 & 0.6& 0.1 }.
+$$
+
+The probability distribution of the initial state $X_0$ is given by $\mathrm{P}(X_0=\mathrm{A})=0.2$, $\mathrm{P}(X_0=\mathrm{B})=0.5$ and $\mathrm{P}(X_0=\mathrm{C})=0.3$. Compute the following probabilities:
+
+**a)** $\mathrm{P}(X_3=\mathrm{A})$, $\mathrm{P}(X_3=\mathrm{B})$ and $\mathrm{P}(X_3=\mathrm{C})$.
+
+**b)** $\mathrm{P}(X_3=\mathrm{A}|X_1=\mathrm{B},X_0=\mathrm{A})$
+
+**c)** $\mathrm{P}(X_3=\mathrm{A}|X_2=\mathrm{C},X_1=\mathrm{B},X_0=\mathrm{A})$
+
+**d)** $\mathrm{P}(X_6=\mathrm{A}|X_3=\mathrm{C})$
+
+**e)** $\mathrm{P}(X_3=\mathrm{C}|X_6=\mathrm{A})$
+
+# Problem 2
+We simplify the real world by 1) classifing each day as either rain or not rain,
+and 2) imagining that the daily weather is a stochastic process where the probability of
+rain tomorrow only depends on whether it rains or not today. 
+If it rains today, the probability of rain tomorrow is 0.70, and if it does not rain today, it will rain tomorrow with probability 0.25. 
+Under these assumptions, the daily weather can be modeled as a Markov chain $\{X_n: n = 0, 1, \ldots\}$, where $n$ denotes day, with two states: "rain" (state 0) and "not rain" (state 1).
+
+\textbf{a)} Explain why the transition probability matrix is given by
+$$
+	\textbf{P} = \begin{bmatrix}
+0.70 & 0.30 \\
+0.25 & 0.75
+\end{bmatrix}.
+$$
+\textbf{b)} Assume that today is Monday and that it is raining. Compute the
+ probability of rain on Friday.
+ 
+\textbf{c)} Use \texttt{R} to numerically compute 
+the following probabilities:
+
+ - $\mathrm{P}(X_{100} = 0 | X_0 = 0)$ 
+ - $\mathrm{P}(X_{100} = 0 | X_0 = 1)$
+ - $\mathrm{P}(X_{100} = 1 | X_0 = 0)$
+ - $\mathrm{P}(X_{100} = 1 | X_0 = 1)$
+
+What do you observe? 
+
+\emph{Comment: We will discuss the concept of \emph{limiting probabilities} and how they can be computed analytically in week 36.}
+
+\textbf{d)} Assume that it rains January 1, and make a script in \texttt{R} where you simulate the weather for one year (365 days) according to the above Markov chain and visualize the results.
+
+\textit{Hint:} The function \texttt{runif()} in \texttt{R} can be useful in your simulations. 
+
+\textbf{e)}
+Run the script $N$ times, where $N$ is a large number, and verify the probabilities you computed in $\textbf{c)}$.
+
+
+# Problem 3
+Consider a Markov chain with state space $\Omega= \{0,1,2,3\}$ whose transition probability matrix is given by
+$$
+	\textbf{P} = \begin{pmatrix}
+1& 0 & 0 & 0\\
+0.1 & 0.4 & 0.1 & 0.4 \\
+0.2 & 0.1 & 0.6 & 0.1 \\
+0 & 0 & 0 & 1\\
+\end{pmatrix}.
+$$
+
+Assume that the starting state is state 1.
+
+\textbf{a) } Compute the expected time to absorption.
+
+\textbf{b) } Compute the probability that the Markov chain ends up in state 0.
+
+
+

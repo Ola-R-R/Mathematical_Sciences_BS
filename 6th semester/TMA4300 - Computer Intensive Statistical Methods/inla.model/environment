@@ -1,0 +1,6 @@
+export INLA_OS='windows'
+export INLA_PATH='C:/Users/olara/OneDrive/R/R-4.2.2/library/INLA/bin'
+export INLA_RHOME='C:/Users/olara/OneDrive/R/R-4.2.2'
+export INLA_RVERSION='4.2'
+export INLA_VERSION='22.12.16'
+export PARDISOLICMESSAGE='1'

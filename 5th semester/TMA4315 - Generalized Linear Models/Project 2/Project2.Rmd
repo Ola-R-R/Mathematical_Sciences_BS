@@ -1,0 +1,357 @@
+---
+title: "Project 2"
+author: 'olarr@ntnu.no: 10031 ; tizianom@ntnu.no: 10006'
+output: pdf_document
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+
+library("tidyverse")
+library("aod")
+library("lmtest")
+library("readxl")
+library("VGAM")
+library("broom")
+library("ggfortify")
+library("MASS")
+library("dampack")
+library("mdscore")
+library("formatR")
+```
+
+# Problem 1
+
+### a)
+
+```{r}
+mammals <- read.table("https://www.math.ntnu.no/~jarlet/statmod/mammals.dat", header=T)
+
+Species <- ifelse(1:nrow(mammals) == 32, "Human", "Non-human")
+
+ggplot(mammals, aes(x = log(body), y = log(brain), color = Species)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = lm, se = F, color = "black")
+
+h0 <- glm(log(brain) ~ log(body), data = mammals, family = "gaussian")
+h0$coefficients
+```
+
+Here we use the natural log transformation on both body mass and brain size to get a more linear visual representation of their relationship.
+
+### b)
+
+```{r}
+# Adding dummy variable to human
+mammals$human <- ifelse(mammals$species == "Human", 1, 0)
+
+h1 <- glm(log(brain) ~ log(body) + human, data = mammals, family = "gaussian")
+# summary(h1)
+
+h1nonlog <- glm(brain ~ body + human, data = mammals, family = "gaussian")
+# summary(h1nonlog)
+
+cat("Human brain size difference is", h1$coefficients[3], "using the log-transformation")
+
+cat("Human brain size difference is", h1nonlog$coefficients[3], "without the log-transformation")
+```
+
+Using the log transformation we see that the difference is approximately $2$ when comparing the average human brain size to other species with the same body mass. With no transformation we see that the difference in average human brain size compared to other species is approximately $1189$ grams.
+
+```{r}
+summary(h1)
+```
+
+Looking at the summary, we see that the human parameter is statistically significant. So human is an outlier.
+
+```{r}
+# Plotting residuals
+df <- fortify(h0)
+
+ggplot(df, aes(x = .fitted, y = .resid, color = Species)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+Looking at the residual plot, we can see that humans are not only an outlier, but it is the biggest outlier in the data.
+
+### c)
+
+We know from introductory statistics course that the pivotal quantity is equal to:
+
+$$
+\frac{y_{n+1}- \hat{\beta}_0 - \hat{\beta}_1x_{n+1}}{s\sqrt{1+\frac{1}{n} + \frac{(x_{n+1}-\bar{x})^2}{\sum_{i=1}^n (x_i-\bar{x})^2}}}
+$$
+
+We use this quantity to compute the one-sided (1-$\alpha$) prediction interval $(-\infty, U)$ for human brain size based on all mammals in the data set except humans.
+
+$$
+P(\frac{y_{n+1}- \hat{\beta}_0 - \hat{\beta}_1x_{n+1}}{s\sqrt{1+\frac{1}{n} + \frac{(x_{n+1}-\bar{x})^2}{\sum_{i=1}^n (x_i-\bar{x})^2}}}<t_{\alpha,n-2})=1-\alpha
+$$
+
+Now we can invert the expression inside the parenthesis, solving it for $y_{n+1}$ and finding the required prediction interval
+
+$$
+\begin{aligned}
+y_{n+1} &- \hat{\beta}_0 - \hat{\beta}_1x_{n+1} < t_{\alpha,n-2} * s\sqrt{1+\frac{1}{n}+\frac{(x_{n+1}-\bar{x})^2}{\sum_{i=1}^n (x_i-\bar{x})^2}} \\
+\\
+y_{n+1} &< \hat{\beta}_0 + \hat{\beta}_1x_{n+1} + t_{\alpha,n-2} * s\sqrt{1+\frac{1}{n}+\frac{(x_{n+1}-\bar{x})^2}{\sum_{i=1}^n (x_i-\bar{x})^2}} \\
+\\
+IC_{y_{n+1}} &= (-\infty ,  \hat{\beta}_0 + \hat{\beta}_1x_{n+1} + t_{\alpha,n-2} * s\sqrt{1+\frac{1}{n}+\frac{(x_{n+1}-\bar{x})^2}{\sum_{i=1}^n (x_i-\bar{x})^2}})
+\end{aligned}
+$$
+
+We now consider a new model where we included a new parameter $\beta_2$ that represents the significance of the human brain (i.e. we multiplied it for a dummy variable $z_i$ equal to 1 if the brain considered is the human one, zero otherwise). Then we compute the profile log-likelihood $l_p(\beta_0,\beta_1)=sup_{\beta_2}l(\beta_0,\beta_1,\beta_2)$ to find the MLE of $\beta_2$ given $\hat\beta_0$, $\hat\beta_1$.
+
+$$
+\begin{aligned}
+y_{i} &= \beta_0 + \beta_1 x_{i} + \beta_2 z_{i} + \epsilon_i \\
+\\
+\hat \beta_2 &= y_{n+1}- \hat \beta_0 - \hat \beta_1 x_{n+1},
+\end{aligned}
+$$
+
+where the subscript in $y_{n+1}$ and $x_{n+1}$ refer to the (n+1)th observation (the human brain size). Applying the "outlier" test involving the test statistic:
+
+$$
+T=\frac{\hat \beta_2}{\sqrt{\widehat {Var{\hat \beta_2}}}}
+$$
+
+and considering the result for $\hat \beta_2$ obtained above we can see the equivalence between the two tests and infer the equivalence of $A$ and $B$, the events that the $IC_{y_{n+1}}$ does not include the observed human brain size and that the $H_0$ hypothesis is rejected at significance level $\alpha$
+
+### d)
+
+```{r}
+gglm <- glm(brain ~ log(body) + human, data = mammals, family = Gamma(link = "log"))
+# summary(gglm)
+
+ggplot(mammals, aes(x = log(body) + human, y = brain, color = Species)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "glm", method.args = list(family = Gamma(link = "log")), se = F, color = "black")
+```
+
+### e)
+
+To test if Kleiber's law applies to this data we test:
+
+$$
+H_0: \hat{\beta}_{body} = \frac{3}{4} \ \ \ \ vs \ \ \ \ H_1: \hat{\beta}_{body} \ne \frac{3}{4}
+$$
+
+```{r}
+h1kleiber <- glm(log(brain) ~ I((3/4) * log(body)) + human, data = mammals, family = "gaussian")
+# summary(h1kleiber)
+
+lr.test(h1kleiber, h1)
+
+
+gglmkleiber <- glm(brain ~ human, offset = I((3/4) * log(body)), data = mammals, family = Gamma(link = "log"))
+# summary(gglmkleiber)
+
+lr.test(gglmkleiber, gglm)
+```
+
+For the linear model, we see that there is no reason to reject the null-hypothesis, so this means that it does follow Kleiber's law. Also for the gamma model, we do not reject the null-hypothesis. This indicates that the model does follow Kleiber's law
+
+### f)
+
+We need to make the log-likelihoods comparable because the response variables for the gamma glm is not on the log scale.
+
+```{r}
+h1nonlogresp <- glm(brain ~ log(body) + human, data = mammals, family = "gaussian")
+
+AIC(h1nonlogresp)
+AIC(gglm)
+```
+
+The model with the lowest AIC offer the best fit, so this means that our gamma model is the best model fro our data.
+
+Finding the theoretical skew of the gamma model:
+
+$$
+\begin{aligned}
+M_{ln(Y)}(t) &= E[e^{t \ \ ln(Y)}] \\
+ &= E[Y^t] \\
+ &=  \int_{0}^{\infty} \frac{\lambda^\alpha}{\Gamma(\alpha)} Y^{t+\alpha} e^{-\lambda y}\,dy \\
+ &= \frac{\lambda^\alpha \Gamma(t+\alpha)}{\lambda^{t+\alpha} \Gamma(\alpha)} \int_{0}^{\infty} \frac{\lambda^{t+\alpha}}{\Gamma(t+\alpha)} Y^{t+\alpha} e^{-\lambda y}\,dy \\
+ &= \frac{\lambda^\alpha \Gamma(t+\alpha)}{\lambda^{t+\alpha} \Gamma(\alpha)} * 1 \\
+ &= \lambda^{-t} \frac{\Gamma(t+\alpha)}{\Gamma(\alpha)} \\
+\\
+K_{ln(Y)}(t) &= ln(M_{ln(Y)}(t)) \\
+ &= -t ln(\lambda) + ln(\Gamma(t+\alpha)) - ln(\Gamma(\alpha)) \\
+ &= [Derivating \ \ two \ \ times \ \ or \ \ more] \\
+ &= ln(\Gamma(t+\alpha)) \\
+\\
+Skew(X) &= \frac{E[(X-E[X])^3]}{(Var[X])^{\frac{3}{2}}} \\
+ &= \frac{k_3}{k_2^{\frac{3}{2}}} \\
+\\
+k_3 &= K_{ln(Y)}^{(3)}(0) \\
+ &= \frac{d^3}{dt^3} (ln(\Gamma(t+\alpha))) \big\vert_{t=0} \\
+\\
+k_2 &= K_{ln(Y)}^{(2)}(0) \\
+ &= \frac{d^2}{dt^2} (ln(\Gamma(t+\alpha))) \big\vert_{t=0}
+\end{aligned}
+$$
+
+The shape parameter $\alpha$ is found by using the dispersion parameter in the summary of "gglm". $\alpha = \frac{1}{dispersion}$.
+
+```{r}
+summary(gglm)
+
+dispersion <- 0.5512612
+alpha <- 1/dispersion
+
+k3 <- psigamma(alpha, 2)
+k2 <- psigamma(alpha, 1)
+
+cat("Skew is", k3/((k2)^(1.5)))
+```
+
+Sample skew formula:
+
+$$
+SSkew = \frac{\frac{1}{n} \sum\limits_{i=1}^n (x_i- \bar x)^3}{(\frac{1}{n-1} \sum\limits_{i=1}^n (x_i- \bar x)^2)^{\frac{3}{2}}}
+$$
+
+```{r}
+resid <- as.vector(h0$residuals)
+
+men <- mean(resid)
+
+teller <- 0
+
+for (i in 1:62) {
+   teller <- teller + (resid[i] - men)^3
+}
+
+teller <- (1/62) * teller
+
+nevner <- 0
+
+for (i in 1:62) {
+   nevner <- nevner + (resid[i] - men)^2
+}
+
+nevner <- ((1/(62-1)) * nevner)^(3/2)
+
+cat("Sample Skew from model in a) is", teller/nevner)
+```
+
+\newpage
+
+# Problem 2
+
+We want to test if there is an advantage starting as white. Test:
+
+$$
+\begin{aligned}
+H_0: \ \ \beta_{1,white} &- \beta_{1,black} \le 0
+\\
+& vs
+\\
+H_1: \ \ \beta_{1,white} &- \beta_{1,black} > 0
+\end{aligned}
+$$
+
+Using the Wald test, we reject the null hypothesis if our Chi square is larger than $X^2_{16, \ 0.05} = 26.296$.
+
+```{r}
+chessdata <- read_excel("Norway Chess 2020_2021.xlsx")
+
+# Alt. hypothesis
+mod1 <- vglm(y ~ factor(white) + factor(black), family=cumulative(parallel = T, link="logitlink"), data = chessdata)
+# summary(mod1)
+
+# Null hypothesis
+mod0 <- vglm(y ~ 1, family=cumulative(parallel = T, link="logitlink"), data = chessdata)
+# summary(mod0)
+
+waldtest(mod0, mod1)
+```
+
+We see that our Chi square is larger than the limit, so we reject the null-hypothesis. This means that overall, there is evidence of an advantage starting as white.
+
+We see that Carlsen, Firouzja and Rapport are strong while playing as white, and that Duda and Tari are strong while playing as black. Using only these players:
+
+```{r}
+summary(mod1)
+
+aronian_white <- as.factor(chessdata$white == "aronian")
+carlsen_white <- as.factor(chessdata$white == "carlsen")
+caruana_white <- as.factor(chessdata$white == "caruana")
+duda_white <- as.factor(chessdata$white == "duda")
+firouzja_white <- as.factor(chessdata$white == "firouzja")
+karjakin_white <- as.factor(chessdata$white == "karjakin")
+nepomniachtchi_white <- as.factor(chessdata$white == "nepomniachtchi")
+rapport_white <- as.factor(chessdata$white == "rapport")
+tari_white <- as.factor(chessdata$white == "tari")
+
+aronian_black <- as.factor(chessdata$black == "aronian")
+carlsen_black <- as.factor(chessdata$black == "carlsen")
+caruana_black <- as.factor(chessdata$black == "caruana")
+duda_black <- as.factor(chessdata$black == "duda")
+firouzja_black <- as.factor(chessdata$black == "firouzja")
+karjakin_black <- as.factor(chessdata$black == "karjakin")
+nepomniachtchi_black <- as.factor(chessdata$black == "nepomniachtchi")
+rapport_black <- as.factor(chessdata$black == "rapport")
+tari_black <- as.factor(chessdata$black == "tari")
+
+mod11 <- vglm(y ~ carlsen_white + firouzja_white + rapport_white + duda_black + tari_black, family=cumulative(parallel = T, link="logitlink"), data = chessdata)
+# summary(mod11)
+
+waldtest(mod0, mod11)
+AIC(mod0)
+AIC(mod1)
+AIC(mod11)
+
+```
+
+The AIC is lower for this reduced model, so it may fit the data better. Then we have $X^2_{6, \ 0.05} = 12.592$. Our observed Chi square is larger, so there is still evidence that there is an advantage playing as white with the strongest players from each color.
+
+```{r}
+# making only classic data
+classicdata <- subset(chessdata, type == "classic")
+
+# model from the classic data
+classicmod1 <- vglm(y ~ factor(white) + factor(black), family=cumulative(parallel = T, link="logitlink"), data = classicdata)
+# summary(classicmod1)
+
+classicmod0 <- vglm(y ~ 1, family=cumulative(parallel = T, link="logitlink"), data = classicdata)
+# summary(classicmod0)
+
+waldtest(classicmod0, classicmod1)
+```
+
+Using only classic matches, we see that there is no significant advantage to start as white. This looks weird, but can be explained by looking at the histogram
+
+```{r}
+hist(classicdata$y)
+```
+
+Here we can see that the majority of matches end in a draw.
+
+```{r}
+# making only armageddon data
+armageddondata <- subset(chessdata, type == "armageddon")
+
+# model from the armageddon data
+armageddonmod1 <- vglm(y ~ factor(white) + factor(black), family=cumulative(parallel = T, link="logitlink"), data = armageddondata)
+# summary(armageddonmod1)
+
+armageddonmod0 <- vglm(y ~ 1, family=cumulative(parallel = T, link="logitlink"), data = armageddondata)
+# summary(armageddonmod0)
+
+waldtest(armageddonmod0, armageddonmod1)
+```
+
+Using only armageddon matches, we see that there is certainly no significant advantage to start as white.
+
+```{r}
+hist(armageddondata$y)
+```
+
+Looking at the histogram, one would think there would still be an advantage. We noticed that the vglm function would not give a strength for "Aronian". Also the summary gives us a lot of NAs, but we could not find the reason why.
+
+```{r}
+summary(armageddonmod1)
+```

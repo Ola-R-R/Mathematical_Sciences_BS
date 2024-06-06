@@ -1,0 +1,145 @@
+---
+title: "Problem xy (use separate files for each problem)"
+author: '10111'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,tidy=TRUE,message=FALSE,warning=FALSE,strip.white=TRUE,prompt=FALSE,
+                      cache=TRUE, size="scriptsize",fig.width=4, fig.height=3)
+
+```
+
+```{r,eval=FALSE,echo=TRUE}
+install.packages("knitr")
+install.packages("MASS")
+install.packages("caret")
+install.packages("pls")
+install.packages("glmnet")
+install.packages("gam")
+install.packages("gbm")
+install.packages("randomForest")
+install.packages("ggfortify")
+install.packages("leaps")
+install.packages("pROC")
+install.packages("sfsmisc")
+```
+
+```{r,eval=TRUE,echo=FALSE}
+library(knitr)
+library(MASS)
+library(keras)
+library(caret)
+library(pls)
+library(glmnet)
+library(gam)
+library(gbm)
+library(randomForest)
+library(ggfortify)
+library(leaps)
+library(pROC)
+library(sfsmisc)
+library(ggplot2)
+```
+
+```{r, eval=TRUE, echo=TRUE}
+id <- "1kGOLsnKA0Uq2lWKlMjhAF8h71sc0WcLO" # google file ID
+d.bodyfat <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))[,-c(1)]
+set.seed(1234)
+training_set_size <- floor(0.80 * nrow(d.bodyfat))
+
+samples <- sample(1: nrow(d.bodyfat),training_set_size , replace=F)
+d.body.train <- d.bodyfat[samples,]
+d.body.test <- d.bodyfat[-samples,]
+```
+
+## a)
+
+```{r, eval=TRUE, echo=TRUE}
+r.lm.BodyFat <- lm(BodyFat ~ . - Abdomen + poly(Abdomen, degree = 2), d.body.train)
+summary(r.lm.BodyFat)
+```
+
+The $R^2$ is $0.7559$. This is rather large, but we see that the Adjusted $R^2$ is smaller. This may indicate that the additional variables in the model is not adding value to the model.
+
+```{r, eval=TRUE, echo=TRUE}
+TA.plot(r.lm.BodyFat,res= residuals(r.lm.BodyFat, type="pearson"))
+
+qqnorm(d.body.train$BodyFat, pch = 1, frame = FALSE)
+qqline(d.body.train$BodyFat, col = "steelblue", lwd = 2)
+#qqplot(d.body.train$BodyFat)
+```
+
+## b)
+
+Below you have to complete the code and then replace `eval=FALSE` by `eval=TRUE` in the chunk options:
+
+```{r, eval=TRUE, echo=TRUE}
+regfit_fwd = regsubsets(BodyFat ~ . - Abdomen + poly(Abdomen, degree = 2), data = d.body.train, nvmax = 14, method = "forward")
+regfit_fwd_summary <- summary(regfit_fwd)
+regfit_fwd_summary$outmat
+plot(regfit_fwd_summary$bic, main = "Forward Stepwise Selection", xlab = "Number of Predictors", ylab = "BIC", type = "l")
+```
+
+Here we can see that the model with 4 predictors give the lowest BIC. That is model 6 with predictors Weight, Neck, Biceps and Wrist.
+
+```{r, eval=TRUE, echo=TRUE}
+best_model <- lm(BodyFat ~ Weight + Neck + Biceps + Wrist, d.body.train)
+
+mse.best_model = mean((d.body.test$BodyFat - predict(best_model, newdata = d.body.test))^2)
+mse.best_model
+```
+
+The MSE is $40.89131$ with the reduced model
+
+## c)
+
+```{r, eval=TRUE, echo=TRUE}
+x.train <- model.matrix(BodyFat ~ . - Abdomen + poly(Abdomen, degree = 2), data = d.body.train)[, -1]
+y.train <- d.body.train$BodyFat
+x.test = model.matrix(BodyFat ~ . - Abdomen + poly(Abdomen, degree = 2), data = d.body.test)[, -1]
+y.test = d.body.test$BodyFat
+
+set.seed(4268)
+cv.lasso <- cv.glmnet(x.train, y.train, alpha = 1)
+plot(cv.lasso)
+cv.lasso$lambda.1se
+bodyfat.lasso <- glmnet(x.train, y.train, alpha = 1, lambda = cv.lasso$lambda.1se)
+coef(bodyfat.lasso)
+mse.lasso = mean((y.test - predict(bodyfat.lasso, newx = x.test))^2)
+mse.lasso
+```
+
+The MSE for Lasso is $50.31623$.
+
+```{r, eval=TRUE, echo=TRUE}
+cv.lasso$lambda.min
+bodyfat.lasso.min <- glmnet(x.train, y.train, alpha = 1, lambda = cv.lasso$lambda.min)
+coef(bodyfat.lasso.min)
+mse.lasso.min = mean((y.test - predict(bodyfat.lasso.min, newx = x.test))^2)
+mse.lasso.min
+```
+
+The MSE when $\lambda_{min}$ is used is much larger than when $\lambda_{1se}$ is used, thus the model with $\lambda_{min}$ is not useful.
+
+## d)
+
+```{r, eval=TRUE, echo=TRUE}
+#Had problems running this in markdown but it worked in rscript
+# pca.train <- prcomp(d.body.train[, c(2:6,8:-1)] + poly(d.body.train[, c(7)], degree = 2), scale = TRUE)
+# var_explained = pca.train$sdev^2 / sum(pca.train$sdev^2)
+
+# screeplot(pca.train, npcs = min(13, length(pca.train$sdev)), type = c("lines"))
+```
+
+See that the first PC explain over 60% of variability, and PC 2-4 explain approximately 10%, and the rest go near 0. So a useful number would be 5 PCs.
+
+```{r, eval=TRUE, echo=TRUE}
+pcr_fit = pcr(BodyFat ~ . - Abdomen + poly(Abdomen, degree = 2), data = d.body.train, scale = TRUE, validation = "CV")
+summary(pcr_fit)
+validationplot(pcr_fit, val.type = "MSEP")
+```

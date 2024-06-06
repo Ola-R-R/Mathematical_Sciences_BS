@@ -1,0 +1,542 @@
+```{r}
+library("RColorBrewer")
+```
+
+## Project 1
+
+This R Markdown-file contains the code for **Project 1** in the course **TMA4265** Stochastic Modelling. The group consists of
+
+-   *Ola Runeson Rasmussen*
+
+-   *Sigurd Kampevold Johanson*
+
+-   *Hanne Blomdal Laupstad*
+
+Do note that the estimated probabilities, confidence intervals, realizations, and other computations in the notebook may vary slightly from the numbers in the report, as we have not set the seed for the randomizations. Moreover, the outputs in this file will not be delivered as we deliver the raw .Rmd-file rather than an .html-file with the output.
+
+### Problem 1
+
+**c)**
+
+Simulate the Markov chain for 20 years (7300 steps):
+
+```{r}
+# Initializing the transition probability matrix
+P <- matrix(c(0.99, 0.01, 0, 0, 0.9, 0.1, 0.005, 0, 0.995), nrow = 3, byrow = TRUE)
+
+# The number of steps
+N <- 7300
+
+# The vector to hold the states
+x <- vector("numeric", length = N + 1)
+
+# Initial state
+x[1] <- 0
+
+# Simulating the chain repeatedly
+for(n in 1:N){
+  
+  # Drawing the next state from the distribution
+  x[n + 1] = sample.int(3, size = 1, replace = TRUE, prob = P[x[n] + 1, ]) - 1
+}
+
+# Plotting the results
+plot(0:N, x, type = "o", lwd = 2, main = "Realization", xlab = "Days", ylab = "State")
+```
+
+For each run of this code, use the last 10 years (of the 20 years) to get an estimate of each of the quantities in b):
+
+```{r}
+# Extract the last 10 years of the run above
+x_new <- tail(x, 3650)
+
+# Compute the number of entries to each state
+tab <- table(x_new)
+
+# Compute the fraction of time spent in each state, i.e., the limiting distribution
+limiting <- c(tab[1] / 3650, tab[2] / 3650, tab[3] / 3650)
+limiting
+```
+
+Run the code 30 times and compute an approximate 95% confidence interval (CI) for each of the quantities in **b)** (using the 30 independent estimates).
+
+```{r}
+# Number of iterations
+n_iter <- 30
+
+# Vectors to hold the values from each run
+values_0 <- vector("numeric", length = n_iter)
+values_1 <- vector("numeric", length = n_iter)
+values_2 <- vector("numeric", length = n_iter)
+
+# Iterate through the n_iter runs
+for (iter in 1:n_iter){
+  # Vector to hold the simulation of the chain
+  x <- vector("numeric", length = N + 1)
+  
+  # Initial state
+  x[1] <- 0
+  
+  # Simulate the chain as in b)
+  for(n in 1:N){
+    x[n + 1] = sample.int(3, size = 1, replace = TRUE, prob = P[x[n] + 1, ]) - 1
+  }
+  
+  # Compute the approximation of the limiting distribution for this run
+  tab <- table(x)
+  limiting <- c(tab[1] / N, tab[2] / N, tab[3] / N)
+  
+  # Append the number of days per year spent in each state to the respective vector
+  values_0[iter] = limiting[1] * 365
+  values_1[iter] = limiting[2] * 365
+  values_2[iter] = limiting[3] * 365
+  
+}
+
+# Compute the CIs as percentiles
+print("95% confidence interval for number of days in state 0:")
+unname(quantile(values_0, c(.025, .975)))
+
+print("95% confidence interval for number of days in state 1:")
+unname(quantile(values_1, c(.025, .975)))
+
+print("95% confidence interval for number of days1 in state 2:")
+unname(quantile(values_2, c(.025, .975)))
+```
+
+**e)**
+
+Simulate $Y_n$ for $n = 300$ trials.
+
+```{r}
+# Initialize number of trials and vectors
+N <- 300
+s <- vector("numeric", length = N + 1)
+i <- vector("numeric", length = N + 1)
+r <- vector("numeric", length = N + 1)
+
+# Initial "states"
+s[1] <- 950
+i[1] <- 50
+r[1] <- 0
+
+for (n in 1:N) {
+  # Draw the number of new people to each state
+  s_new <- rbinom(1, r[n], 0.005)
+  i_new <- rbinom(1, s[n], 0.5 * i[n] / 1000)
+  r_new <- rbinom(1, i[n], 0.1)
+  
+  # Compute the number of people in each state at the next time step
+  s[n + 1] = s[n] + s_new - i_new
+  i[n + 1] = i[n] + i_new - r_new
+  r[n + 1] = r[n] + r_new - s_new
+}
+```
+
+Plot the realization.
+
+```{r}
+# Plot the realization
+steps <- seq(1, 301, 1)
+
+plot(steps, s, type = "l", col = "red", main = "Realization", xlab = "Days", ylab = "Number of People", ylim = c(0, 1000))
+lines(steps, i, type = "l", col = "blue")
+lines(steps, r, type = "l", col = "green")
+legend("topright", legend = c("Susceptible", "Infected", "Recovered"), fill = c("red", "blue", "green"))
+```
+
+**f)**
+
+Estimate the expected maximum number of infected individuals during the simulated time steps and the expected time at which the number of infected individuals first takes it highest value.
+
+```{r}
+# Number of iterations
+n_iter <- 1000
+
+# Vectors to hold values for each iteration
+largest_i = vector("numeric", length = n_iter)
+largest_step_i = vector("numeric", length = n_iter)
+
+for (iter in 1:n_iter) {
+  # Vectors for the simulation
+  N <- 300
+  s <- vector("numeric", length = N + 1)
+  i <- vector("numeric", length = N + 1)
+  r <- vector("numeric", length = N + 1)
+  
+  # Initial state
+  s[1] <- 950
+  i[1] <- 50
+  r[1] <- 0
+  
+  # Variables to store values of interest
+  max <- 0
+  max_index <- 0
+  
+  # Simulate
+  for (n in 1:N) {
+    s_new <- rbinom(1, r[n], 0.005)
+    i_new <- rbinom(1, s[n], 0.5 * i[n] / 1000)
+    r_new <- rbinom(1, i[n], 0.1)
+    
+    s[n + 1] = s[n] + s_new - i_new
+    i[n + 1] = i[n] + i_new - r_new
+    r[n + 1] = r[n] + r_new - s_new
+    
+    # Update the value of interest
+    if (i[n + 1] > max) {
+      max <- i[n + 1]
+      max_index <- n + 1
+    }
+  }
+  
+  # Store values
+  largest_i[iter] = max
+  largest_step_i[iter] = max_index
+}
+
+c("Expected maximum number of infected:"= mean(largest_i), 
+  "Expected time step to reach maximum number:" = mean(largest_step_i))
+```
+
+```{r}
+c("95% confidence interval on maximum number of infected individuals:")
+unname(quantile(largest_i, c(.025, .975)))
+
+c("95% confidence interval on time step to reach maximum number:")
+unname(quantile(largest_step_i, c(.025, .975)))
+```
+
+**g)**
+
+The only elements in the below code that are different from the above simulations are the initial states and the initial population. Thus, the following code chunks are not commented, as we see it unnecessary.
+
+Case 1 - 100 vaccinated individuals:
+
+```{r}
+n_iter <- 1000
+n_vacc <- 100
+
+largest_i = vector("numeric", length = n_iter)
+largest_step_i = vector("numeric", length = n_iter)
+
+for (iter in 1:n_iter) {
+  N <- 300
+  s <- vector("numeric", length = N + 1)
+  i_case1 <- vector("numeric", length = N + 1)
+  r <- vector("numeric", length = N + 1)
+  
+  s[1] <- 950 - n_vacc
+  i_case1[1] <- 50
+  r[1] <- 0
+  
+  max <- 0
+  max_index <- 0
+  
+  for (n in 1:N) {
+    s_new <- rbinom(1, r[n], 0.005)
+    i_new <- rbinom(1, s[n], 0.5 * i[n] / 1000)
+    r_new <- rbinom(1, i_case1[n], 0.1)
+    
+    s[n + 1] = s[n] + s_new - i_new
+    i_case1[n + 1] = i_case1[n] + i_new - r_new
+    r[n + 1] = r[n] + r_new - s_new
+    
+    if (i_case1[n + 1] > max) {
+      max <- i_case1[n + 1]
+      max_index <- n + 1
+    }
+  }
+  
+  largest_i[iter] = max
+  largest_step_i[iter] = max_index
+}
+
+c("Expected maximum number of infected:"= mean(largest_i), 
+  "Expected time step to reach maximum number:" = mean(largest_step_i))
+```
+
+Case 2 - 600 vaccinated individuals:
+
+```{r}
+n_iter <- 1000
+n_vacc <- 600
+
+largest_i = vector("numeric", length = n_iter)
+largest_step_i = vector("numeric", length = n_iter)
+
+for (iter in 1:n_iter) {
+  N <- 300
+  s <- vector("numeric", length = N + 1)
+  i_case2 <- vector("numeric", length = N + 1)
+  r <- vector("numeric", length = N + 1)
+  
+  s[1] <- 950 - n_vacc
+  i_case2[1] <- 50
+  r[1] <- 0
+  
+  max <- 0
+  max_index <- 0
+  
+  for (n in 1:N) {
+    s_new <- rbinom(1, r[n], 0.005)
+    i_new <- rbinom(1, s[n], 0.5 * i[n] / 1000)
+    r_new <- rbinom(1, i_case2[n], 0.1)
+    
+    s[n + 1] = s[n] + s_new - i_new
+    i_case2[n + 1] = i_case2[n] + i_new - r_new
+    r[n + 1] = r[n] + r_new - s_new
+    
+    if (i_case2[n + 1] > max) {
+      max <- i_case2[n + 1]
+      max_index <- n + 1
+    }
+  }
+  
+  largest_i[iter] = max
+  largest_step_i[iter] = max_index
+}
+
+c("Expected maximum number of infected:"= mean(largest_i), 
+  "Expected time step to reach maximum number:" = mean(largest_step_i))
+```
+
+Case 3 - 800 vaccinated individuals:
+
+```{r}
+n_iter <- 1000
+n_vacc <- 800
+
+largest_i = vector("numeric", length = n_iter)
+largest_step_i = vector("numeric", length = n_iter)
+
+for (iter in 1:n_iter) {
+  N <- 300
+  s <- vector("numeric", length = N + 1)
+  i_case3 <- vector("numeric", length = N + 1)
+  r <- vector("numeric", length = N + 1)
+  
+  s[1] <- 950 - n_vacc
+  i_case3[1] <- 50
+  r[1] <- 0
+  
+  max <- 0
+  max_index <- 0
+  
+  for (n in 1:N) {
+    s_new <- rbinom(1, r[n], 0.005)
+    i_new <- rbinom(1, s[n], 0.5 * i[n] / 1000)
+    r_new <- rbinom(1, i_case3[n], 0.1)
+    
+    s[n + 1] = s[n] + s_new - i_new
+    i_case3[n + 1] = i_case3[n] + i_new - r_new
+    r[n + 1] = r[n] + r_new - s_new
+    
+    if (i_case3[n + 1] > max) {
+      max <- i_case3[n + 1]
+      max_index <- n + 1
+    }
+  }
+  
+  largest_i[iter] = max
+  largest_step_i[iter] = max_index
+}
+
+c("Expected maximum number of infected:"= mean(largest_i), 
+  "Expected time step to reach maximum number:" = mean(largest_step_i))
+```
+
+Visualization of differences for evolution of $I_n$:
+
+```{r}
+steps <- seq(1, 301, 1)
+
+plot(steps, i, type = "l", col = "black", main = "Realization", xlab = "Days", ylab = "Number of Infected People")
+lines(steps, i_case1, type = "l", col = "red")
+lines(steps, i_case2, type = "l", col = "blue")
+lines(steps, i_case3, type = "l", col = "green")
+legend("topright", legend = c("Original case", "Case 1", "Case 2", "Case 3"), fill = c("black", "red", "blue", "green"))
+```
+
+### Problem 2
+
+**a)**
+
+Write code to verify the calculation by simulating 1000 realizations of the Poisson process.
+
+```{r}
+# Defining parameters to be used
+t <- 59
+lambda <- 1.5
+N <- 1000
+x <- vector("numeric", N + 1)
+
+# Iterating through the simulations
+for (i in 1:N){
+  # Draws the number of events to occur before t = 59
+  n_events <- rpois(1, lambda * t)
+  
+  # Append 1 to the x-vector if more than 100 events occur, else, append 0
+  if (n_events > 100){
+    x[i] = 1
+  } else {
+    x[i] = 0
+  }
+}
+
+# Compute the mean of the x-vector representing the desired probability
+mean(x)
+```
+
+Make a figure that shows 10 realizations of $X(t), 0 \leq t \leq 59$, plotted in the same figure.
+
+```{r}
+# Defining parameters
+cols <- brewer.pal(n = 10, name = 'RdBu')
+t <- 59
+lambda <- 1.5
+N <- 9
+
+# First simulation
+# Draw the number of events from a Poission distribution
+n_events <- rpois(1, lambda * t)
+
+# Draw and sort the placement of events from a uniform distribution
+t_values <- runif(n_events, 0, t)
+t_values = c(0, sort(t_values), t)
+
+# Values for plotting
+x_values = c(0:n_events, n_events)
+
+# Plotting
+plot(NULL, NULL, xlim = c(0, t), ylim = c(0, 100), xlab = "Time", ylab = "Events", main = "Realization", lwd = 2)
+
+for (i in 1:(length(x_values) - 1)){
+  lines(t_values[i:(i + 1)], rep(x_values[i], 2), lwd = 2, col = cols[1])
+}
+
+# Repeating for the last 9 simulations, and appending the simulations to the plot
+for (n in 1:N) {
+  n_events <- rpois(1, lambda * t)
+
+  t_values <- runif(n_events, 0, t)
+  
+  t_values = c(0, sort(t_values), t)
+  
+  x_values = c(0:n_events, n_events)
+  
+  for (i in 1:(length(x_values) - 1)){
+    
+    lines(t_values[i:(i + 1)], rep(x_values[i], 2), lwd = 2, col = cols[n])
+  
+  }
+}
+
+# Appending the mean to the visualization
+lines(c(0, t), c(0, lambda * t), col = "green", lwd = 4)
+
+legend("topleft", legend = c("Mean"), fill = c("green"))
+```
+
+**b)** Write code that uses 1000 simulations to estimate the probability that the total claim exceeds 8 mill. kr. at March 1.
+
+```{r}
+# Initializing parameters and variables
+N <- 1000
+gamma <- 10
+lambda <- 1.5
+t <- 59
+values <- vector("numeric", N)
+
+# Iterating through the simulations
+for (n in 1:N) {
+  # Drawing the number of events from a Poisson distribution
+  n_events <- rpois(1, lambda * t)
+  
+  # Vector to hold the claims
+  z_vector <- vector("numeric", n_events)
+  
+  # Iterating through the events
+  for (i in 1:n_events){
+    # Drawing and appending the claim from an exponential distribution
+    claim <- rexp(1, gamma)
+    z_vector[i] = claim
+  }
+  
+  # Append 1 if the sum of the claims exceed 8 mill. kr., else, append 0
+  if (sum(z_vector) > 8) {
+    values[n] = 1
+  } else {
+    values[n] = 0
+  }
+}
+
+# Compute the mean of the values vector to estimate the probability
+mean(values)
+```
+
+Make a figure that shows 10 realizations of $Z(t), 0 \leq t \leq 59$, plotted in the same figure.
+
+```{r}
+# Initializing 
+cols <- brewer.pal(n = 10, name = 'Paired')
+gamma <- 10
+lambda <- 1.5
+t <- 59
+N <- 9
+
+# Simulating the first realization
+# Drawing the number of events from a Poisson distribution
+n_events <- rpois(1, lambda * t)
+
+# Drawing and sorting the placement of events from a uniform distribution
+t_values <- runif(n_events, 0, t)
+t_values = c(0, sort(t_values), t)
+
+# Values for plotting
+x_values = c(0:n_events, n_events)
+
+# Initializing z-vector to hold claims
+z_vector <- vector("numeric", n_events)
+
+# Iterating through the events, i.e., claims
+for (i in 1:n_events){
+  # Drawing and appending size of claim from an exponential distribution
+  claim <- rexp(1, gamma)
+  z_vector[i] = claim
+}
+
+# Initializing a cumulative vector from the z-vector
+z_cum <- c(0, cumsum(z_vector))
+
+# Plotting the realization
+plot(NULL, NULL, xlim = c(0, t), ylim = c(0, 12), xlab = "Time", ylab = "Total Claim Amount", main = "Realization", lwd = 2)
+
+for (i in 1:(length(x_values) - 1)){
+  lines(t_values[i:(i + 1)], rep(z_cum[i], 2), lwd = 2, col = cols[1])
+}
+
+# Simulating the 9 last realizations and appending them to the visualization
+for (n in 1:N) {
+  n_events <- rpois(1, lambda * t)
+  
+  t_values <- runif(n_events, 0, t)
+  
+  t_values = c(0, sort(t_values), t)
+  
+  x_values = c(0:n_events, n_events)
+  
+  z_vector <- vector("numeric", n_events)
+  
+  for (i in 1:n_events){
+    claim <- rexp(1, gamma)
+    z_vector[i] = claim
+  }
+  
+  z_cum <- c(0, cumsum(z_vector))
+  
+  for (i in 1:(length(x_values) - 1)){
+    lines(t_values[i:(i + 1)], rep(z_cum[i], 2), lwd = 2, col = cols[n])
+  }
+}
+```

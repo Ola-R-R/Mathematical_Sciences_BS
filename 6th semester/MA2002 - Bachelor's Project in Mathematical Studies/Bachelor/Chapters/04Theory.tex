@@ -1,0 +1,128 @@
+
+\section{Generalized linear Models}
+
+\noindent All of this theory is collected from \cite{regression} if not stated otherwise. In a Generalized linear Model (GLM), where we have $i = 1, 2, \dots, n$ observations, we want to find a linear relationship between the covariate vectors, the $\mathbf{x}_i$'s, and a transformation of the expected value, mean $\mu_i$, of a distribution. That is,
+
+\begin{equation}
+g(\mu_i) = \eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}.
+\label{eqn:Link}
+\end{equation}
+
+\noindent where $g(\mu_i)$, the link function, is the function that transforms this into a linear relationship, and $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$ is called the linear predictor. There are many different link functions for different distributions. One thing these distributions have in common is that they are a part of the Exponential Family of distributions. The probability mass function of a multivariate exponential family for the response variable $y_i$ is defined by,
+
+\begin{equation}
+f(y_i|\theta_i) = exp\Biggl\{ \frac{y_i\theta_i - b(\theta_i)}{\phi} w_i + c(y_i,\phi,w_i) \Biggr\},
+\label{eqn:ExpFam}
+\end{equation}
+
+\noindent where the parameter $\theta_i$ is called the natural or canonical parameter, the parameter $\phi$ is the dispersion parameter, and $w_i$, usually a weight, is a known value. For the function $b(\theta_i)$, it is required that $f(y_i|\theta_i)$ can be normalized and that $b'(\theta_i)$ and $b''(\theta_i)$ exist. The expected value and variance of this probability mass function is then defined by,
+
+\begin{equation*}
+E[y_i] = \mu_i = b'(\theta_i), \ \ Var[y_i] = \sigma_i^2 = \phi \frac{b''(\theta_i)}{w_i}.
+\label{eqn:EV}
+\end{equation*}
+
+\section{Generalized linear Mixed models }
+
+\noindent Generalized linear Mixed models (GLMMs) are defined by adding a random effect $\boldsymbol{\gamma}_i$ to the linear predictor $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$. The responses $y_{ij}$, where $i = 1,\dots,m$, $j = 1, \dots, n_i$, with $n_i$ being the measurements per individual or cluster. When adding a cluster specific random effect $\boldsymbol{\gamma}_i$ to the responses $y_{ij}$, the conditional mean $\mu_{ij} = E[y_{ij}|\gamma_i]$ is linked to the linear predictor,
+
+\begin{equation}
+\eta_{ij} = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{u}_{ij}^\top \boldsymbol{\gamma}_i, \ \ \ \ i = 1,\dots,m, \ \ \ \ j = 1, \dots, n_i,
+\label{eqn:LinPredGLMM}
+\end{equation}
+
+\noindent through the link function $g(\mu_{ij}) = \eta_{ij}$. Here the random effects $\gamma_i$ are independent and identically distributed $N(0,Q)$ where $Q$ is the covariance matrix for the random effects \cite{regression} p. 391. To estimate these fixed and random effects, I will use the "glmmTMB" package in R. Simply said, this package will numerically approximate the estimated values.
+
+\section{Poisson process}
+
+\noindent One distribution that is a part of the exponential family of distributions, is the Poisson distribution. It is defined by the density,
+
+\begin{equation}
+f(y_i|\lambda_i) = \frac{\lambda_i^{y_i} e^{-\lambda_i}}{y_i!}, \ \ y_i = 0,1,\dots,
+\label{eqn:expPDF}
+\end{equation}
+
+\noindent where $y_i$ is the total amount of times an event occurs in an interval, and $\lambda_i > 0$ is the rate at which the occurrences happen. In this thesis I will model the scores in a basketball match via a Poisson process. The mean and variance of the Poisson distribution is the same. That is,
+
+\begin{equation*}
+E[y_i] = \mu_i = \lambda_i, \ \ Var[y_i] = \lambda_i.
+\label{eqn:expEV}
+\end{equation*}
+
+\noindent The natural link function to use for the Poisson distribution is the log-link function, which is given by,
+
+\begin{equation}
+g(\lambda_i) = \log(\lambda_i) = \eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}.
+\label{eqn:explink}
+\end{equation}
+
+\noindent This assures us that the rate $\lambda_i > 0$ for all $\beta \in \Re^p$. The Mixed Poisson model with the log-link function is called the mixed log-linear Poisson model. It is defined as seen below where $y_{ij}|\boldsymbol{\gamma}_i \sim \text{Poisson}(\lambda_{ij})$, where
+
+\begin{equation}
+\log(\lambda_{ij}) = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{u}_{ij}^\top \boldsymbol{\gamma}_i.
+\label{eqn:logLinkGLMM}
+\end{equation}
+
+\noindent In this thesis, the random effects I will use is attack strength $\gamma_{A,i,k}$ and defence strength $\gamma_{D,i,k}$. The notation,
+
+\begin{equation}
+\log(\lambda_{ijk}) = "\text{fixed effects}"_k + \gamma_{A,i,k} + \gamma_{D,j,k},
+\label{eqn:logLinkGLMMbasket}
+\end{equation}
+
+\noindent will be used where $i$ is the attacking team, $j$ is the defending team, and $k$ is the scoring type.
+
+A Poisson process is a continous time process, where events happen independently of one another with a certain rate (intensity) $\lambda$. The probability of $n$ scores in a match is then, 
+
+\begin{equation}
+P\big((\text{\# scores of type } k) = n\big) = \frac{\lambda^n}{n!} e^{-\lambda}.
+\label{eqn:poipro}
+\end{equation}
+
+\noindent In \cite{poissonNBA}, the authors comes to the conclusion that the scores in a basketball match can mostly be seen as a Poisson process, but in close games, the Poisson process assumption breaks. This will be discussed further in Section \ref{future}. In this thesis, I will assume that the scores follow a Poisson process. 
+
+\section{AIC}
+
+\noindent Akaike Information Criterion (AIC) is an estimator for the quality of our model given our data. It penalizes complex models by taking the amount of estimated parameters into account. The formula for AIC is,
+
+\begin{equation}
+\text{AIC} = 2k - 2 ln(\hat{L}),
+\label{eqn:AIC}
+\end{equation}
+
+\noindent where $k$ is the number of estimated parameters and $\hat{L}$ is the maximized value of the likelihood function of our model. The AIC is an estimator for the Kullback Leibler distance between the actual and "true" model. The data will generate an unknown distribution, so the difference between the poisson distribution used and this unknown distribution is then the Kullback Leiber distance, showing how different these two distributions are \cite{kullback}. I will use this criteria to find the best model for the Covid season and the other seasons.
+
+\newpage
+
+\section{Likelihood Ratio Test (LRT)}
+
+\noindent Together with the AIC of a model, the likelihood ratio Test is also used to find significant variables in a model. When testing the hypothesis $H_0: \ \beta = 0$ vs. $H_1: \ \beta \neq 0$, we can use the (log-)likelihood ratio statistic,
+
+\begin{equation}
+\text{lr} = 2\big\{ l(\hat\beta) - l(\tilde\beta) \big\} = -2\big\{ l(\tilde\beta) - l(\hat\beta) \big\},
+\label{eqn:lrs}
+\end{equation}
+
+\noindent where $l(\tilde\beta)$ is the log-likelihood for the restricted model under $H_0$ and  $l(\hat\beta)$ is the log-likelihood of the full model \cite{regression} p. 662-663\\
+
+\section{AR(1)-process}
+
+\noindent An AR(1), auto-regressive, process is a stochastic random process. The AR(1) process $\{X_t\}_{t \in Z}$ is defined as a causal stationary series satisfying the equation,
+
+\begin{equation}
+X_t = \varphi X_{t-1} + \epsilon_t, \ \ t = 1,2,\dots,
+\label{eqn:ar1}
+\end{equation}
+
+\noindent where $|\varphi| < 1$ and $\epsilon_t$ is the white noise with zero mean and variance $\sigma^2_\epsilon$. They are identically and independently distributed \cite{timeseries} p. 15.
+
+\section{OU-process}
+
+\noindent A stationary Gaussian Ornstein-Uhlenbeck process, Gaussian continuous-time AR(1) process, is considered as the continuous-time analogue of the discrete-time AR(1) process, \cite{timeseries} p.343. It can have irregular timepoints instead of the constant even time differences in the AR(1) process. The OU-process $\{U_t\}_{t \in R}$ is defined by the stochastic differential equation,
+
+\begin{equation}
+dU_t = -\theta U_t dt + \sigma dW_t,
+\label{eqn:ou}
+\end{equation}
+
+\noindent where $\theta > 0$, $\sigma > 0$ are parameters and $U_t \sim N\big(u_o e^{-\theta t}, \frac{\sigma^2}{2\theta}\big\{1 - e^{-2\theta t}\big\}\big)$ \cite{IBE2013263}. ${W_t}$ is the Wiener process, which is a two-sided Brownian motion \cite{voutilainen_viitasaari_ilmonen_2019}. An important property of \ref{eqn:ou} is that the autocovariancefunction decreases exponentially.

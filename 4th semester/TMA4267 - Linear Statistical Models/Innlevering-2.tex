@@ -1,0 +1,342 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\title{Assignment 2}
+\author{Ola Rasmussen}
+\date{}
+
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Assignment 2},
+  pdfauthor={Ola Rasmussen},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\begin{document}
+\maketitle
+
+\hypertarget{problem-1}{%
+\subsection{Problem 1}\label{problem-1}}
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\item
+  \begin{enumerate}
+  \def\labelenumii{\arabic{enumii}.}
+  \item
+    \begin{itemize}
+    \tightlist
+    \item
+      Estimate: \(\hat\beta = (X^TX)^{-1}X^TY\)
+    \item
+      Std. Error: \(\dfrac{\sigma}{\sqrt{n}}\)
+    \item
+      T-value: \(T = \dfrac{Estimate}{Std. Error}\)
+    \item
+      Pr(\textgreater\textbar t\textbar): \(P-value(t)=P(T\geq t)\)
+    \item
+      \(Y = X\beta+\epsilon\) is a quantitative measurement of disease
+      progression one year after baseline.
+    \item
+      \(n\) is the number of observations and \(\sigma\) is standard
+      deviation.
+    \end{itemize}
+  \item
+    Estimate of the intercept we interpret is at \(\hat\beta_0\). We get
+    this when all the other covariates are zero.
+  \item
+    When the bmi covariate increases by 1, the Y-value increases by
+    5.59548.
+  \item
+    Residual standard error: 54.16 on 431 degrees of freedom.
+
+    The formula is: \(\dfrac{1}{n}\sum_{i=1}^\infty(Y_i - \hat Y_i)^2\)
+  \item
+    With a significant level at 0.05 we would consider sex, bmi, map and
+    ltg so be significant.
+
+    \(H_0: p-value_{covariate}\leq\alpha\)
+
+    versus
+
+    \(H_1: p-value_{covariate}>\alpha\)
+
+    For the p-value to be valid, we need to assume that the
+    null-hypothesis is correct.
+  \end{enumerate}
+\item
+  I would say that the fit of the full model is OK. The adjusted
+  R-squared value is about 0.5, and since humans are hard to predict,
+  that is a good adjusted R-squared value.
+
+  Less than half of the null-hypotheses are rejected, so i would not say
+  that the model is significant at level \(\alpha = 0.05\).
+
+  \(H_0: \beta_{age} = \beta_{sex} =\beta_{bmi} =\beta_{map} =\beta_{tc} =\beta_{ldl} =\beta_{hdl} =\beta_{tch} =\beta_{ltg} =\beta_{glu} = 0\)
+
+  versus
+
+  \(H_1:\) at least one \(\ne 0\)
+
+  Multiple R-squared is a measurement for the fit of the model. The
+  value 0.5176 means that the full model explains roughly 50\% of the
+  data.
+\item
+  A reduced model can have a better performance than a full model
+  because it might reduce overfitting when we want to predict the
+  future.
+
+  In the best subset model selection, all the possible combinations of
+  the independent variables are considered. They are tested by some
+  criterion.
+
+  Some of these criterion are adjusted R-squared and Bayesian
+  Information Criterion (BIC).
+
+  Adjusted R-squared is used because it includes a correction term for
+  the number of parameters. The bigger the better.
+
+  BIC introduces a penalty term for the number of parameters. The lower
+  the better.
+
+  Based on the results of the adjusted R-squared and the BIC criteria, I
+  choose model 6. It has the second lowest BIC value while also having
+  the second highest adjusted R-squared value. The other contenders are
+  model 5 and 7. Model 5 has a much lower adjusted R-squared value and
+  model 7 has a much higher BIC value.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ds }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"https://web.stanford.edu/\textasciitilde{}hastie/CASI\_files/DATA/diabetes.csv"}\NormalTok{, }\AttributeTok{sep =} \StringTok{","}\NormalTok{)}
+\NormalTok{model6 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(prog }\SpecialCharTok{\textasciitilde{}}\NormalTok{ sex }\SpecialCharTok{+}\NormalTok{ bmi }\SpecialCharTok{+}\NormalTok{ map }\SpecialCharTok{+}\NormalTok{ tc }\SpecialCharTok{+}\NormalTok{ ldl }\SpecialCharTok{+}\NormalTok{ ltg, }\AttributeTok{data =}\NormalTok{ ds)}
+\FunctionTok{summary}\NormalTok{(model6)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## lm(formula = prog ~ sex + bmi + map + tc + ldl + ltg, data = ds)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -158.277  -39.476   -2.068   37.221  148.693 
+## 
+## Coefficients:
+##              Estimate Std. Error t value Pr(>|t|)    
+## (Intercept) -335.3586    25.3234 -13.243  < 2e-16 ***
+## sex          -21.5914     5.7056  -3.784 0.000176 ***
+## bmi            5.7110     0.7073   8.075 6.69e-15 ***
+## map            1.1266     0.2158   5.219 2.79e-07 ***
+## tc            -1.0429     0.2208  -4.724 3.12e-06 ***
+## ldl            0.8433     0.2298   3.670 0.000272 ***
+## ltg          168.7953    16.8279  10.031  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 54.06 on 435 degrees of freedom
+## Multiple R-squared:  0.5149,  Adjusted R-squared:  0.5082 
+## F-statistic: 76.95 on 6 and 435 DF,  p-value: < 2.2e-16
+\end{verbatim}
+
+  Comparing Model 6 with the full model we observe that the adjusted
+  R-squared value has increased, implying that the model fit more to the
+  data. We also observe that all of the null-hypotheses are rejected,
+  which means that the model is significant.
+\item
+  Test:
+
+  \(H_0: \beta_{age} = \beta_{tc} =\beta_{ldl} =\beta_{tch} =\beta_{glu} = 0\)
+
+  versus
+
+  \(H_1:\) at least one \(\ne 0\)
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ds }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"https://web.stanford.edu/\textasciitilde{}hastie/CASI\_files/DATA/diabetes.csv"}\NormalTok{, }\AttributeTok{sep =} \StringTok{","}\NormalTok{)}
+\NormalTok{reduced }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(prog }\SpecialCharTok{\textasciitilde{}}\NormalTok{ age }\SpecialCharTok{+}\NormalTok{ tc }\SpecialCharTok{+}\NormalTok{ ldl }\SpecialCharTok{+}\NormalTok{ tch }\SpecialCharTok{+}\NormalTok{ glu, }\AttributeTok{data =}\NormalTok{ ds)}
+\FunctionTok{summary}\NormalTok{(reduced)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## lm(formula = prog ~ age + tc + ldl + tch + glu, data = ds)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -156.22  -51.39   -7.70   47.15  191.84 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept) -94.1711    28.0725  -3.355 0.000864 ***
+## age           0.3166     0.2547   1.243 0.214455    
+## tc            0.7294     0.2128   3.428 0.000666 ***
+## ldl          -1.3202     0.2669  -4.946 1.08e-06 ***
+## tch          29.9553     3.4764   8.617  < 2e-16 ***
+## glu           1.3528     0.3140   4.308 2.03e-05 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 65.7 on 436 degrees of freedom
+## Multiple R-squared:  0.2819,  Adjusted R-squared:  0.2737 
+## F-statistic: 34.23 on 5 and 436 DF,  p-value: < 2.2e-16
+\end{verbatim}
+
+  We can see that the adjusted R-squared value has drastically gone
+  down, so i would prefer the full model of this reduces model.
+\end{enumerate}
+
+\hypertarget{problem-2}{%
+\subsection{Problem 2}\label{problem-2}}
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\item
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{pvalues }\OtherTok{\textless{}{-}} \FunctionTok{scan}\NormalTok{(}\StringTok{"https://www.math.ntnu.no/emner/TMA4267/2018v/pvalues.txt"}\NormalTok{)}
+\FunctionTok{sum}\NormalTok{(pvalues }\SpecialCharTok{\textless{}} \FloatTok{0.05}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 155
+\end{verbatim}
+
+  We reject 155 null-hypotheses.
+
+  A type 1 error occurs when we reject a null-hypothesis when said
+  null-hypothesis is true.
+
+  We do not know the number of false positive findings in out data, but
+  we can assume it given \(\alpha = 0.05\)
+\item
+  The familywise error rate (FWER) is defined as the probability of one
+  or more false positive findings.
+
+  Controlling the FWER at level 0.05 means that we set an upper limit to
+  the FWER. That is we set a cut-off on the p-value.
+
+  Given \(\alpha = 0.05\) and \(m = 1000\), we want the cut-off on
+  p-values to be
+  \(\alpha_{loc} = \dfrac{\alpha}{m} = \dfrac{0.05}{1000} = 0.00005\)
+  for out data using the Bonferroni method.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{pvalues }\OtherTok{\textless{}{-}} \FunctionTok{scan}\NormalTok{(}\StringTok{"https://www.math.ntnu.no/emner/TMA4267/2018v/pvalues.txt"}\NormalTok{)}
+\FunctionTok{sum}\NormalTok{(pvalues }\SpecialCharTok{\textless{}} \FloatTok{0.00005}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 50
+\end{verbatim}
+
+  Using the Bonferroni method with \(\alpha_{loc} = 0.00005\), we reject
+  50 null-hypotheses.
+\item
+  Assuming that the first 900 null-hypotheses are true ant the last 100
+  are false, it implies that 10\% of the number of type 1 and type 2
+  errors are false.
+\end{enumerate}
+
+\end{document}

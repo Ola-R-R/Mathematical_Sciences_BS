@@ -1,0 +1,7 @@
+{
+    "installOptions": {
+        "installFromRepository": true,
+        "libraryPath": "C:/Users/Ola/OneDrive/R/R-4.2.3/library",
+        "installDependencies": true
+    }
+}

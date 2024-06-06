@@ -1,0 +1,302 @@
+---
+title: <div align="center">TMA4275; Project 3</div>
+author: "Ola Rasmussen"
+output:
+  pdf_document: 
+    toc: yes
+    toc_depth: 2
+fontsize: 12pt
+mainfont: Times New Roman
+spacing: 1.5
+indent: true
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, fig.align = "center", tidy.opts = list(width.cutoff = 60), fig.height = 8)
+
+library("tidyverse")
+library("ggfortify")
+library("MASS")
+library("knitr")
+library("rmarkdown")
+library("palmerpenguins")
+library("survival")
+```
+
+\newpage
+
+# Problem 1:
+
+## Introduction
+
+In this problem we will study a tire failure known as tread and belt separation (TBS) in Kristov et al (2002).
+
+## a)
+
+Here we will use the R function *coxph* to redo the two Cox regression analyses reported in Tables 2 and 3 in Kristov et al (2002), and then discuss the importance of the various covariates.
+
+```{r}
+tire <- read.csv("Filer/tire.txt", sep="")
+
+mod <- coxph(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(mod)
+
+modsign <- coxph(Surv(Survival, Censor) ~ Wedge + Inter + Peel + WxP, tire)
+summary(modsign)
+```
+
+\newpage
+
+## b)
+
+Now we will write our own R code, using the Breslow estimator, to estimate the integrated hazard rate for a component with all covariate values equal to unity, $A_0(t, x_0)$, for each of the two models considered in a). We will then compare them by plotting them. We will also find the corresponding estimated survival functions and visualize them. The Breslow esimator is given by,
+
+$$
+\tag{1.1}
+\widehat{A}_0(t) = \sum_{T_j \le t} \frac{1}{\sum_{l \in \Re_j} r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_l(T_j))} = \sum_{T_j \le t} \frac{1}{\sum_{l \in \Re_j} exp\Bigl( \widehat{\boldsymbol{\beta}}^T \cdot \mathbf{x}_l(T_j) \Bigr)},
+$$
+
+\noindent but if the covariates are fixed, as they are in our problem, we may use,
+
+$$
+\tag{1.2}
+\widehat{A}(t | \mathbf{x}_0) = \widehat{A}_0(t) \cdot r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_0) = \widehat{A}_0(t) \cdot exp\Bigl( \widehat{\boldsymbol{\beta}}^T \Bigr) = \sum_{T_j \le t} \frac{exp\Bigl( \widehat{\boldsymbol{\beta}}^T \Bigr)}{\sum_{l \in \Re_j} exp\Bigl( \widehat{\boldsymbol{\beta}}^T \cdot \mathbf{x}_l(T_j) \Bigr)}.
+$$
+
+\noindent To handle the ties, we will just take the average of the jumps happening at the same time. The corresponding survival function is given by,
+
+$$
+\tag{1.3}
+\widehat{S}(t | \mathbf{x}_0) = \prod_{j | T_j \le t}\bigl( 1 - \Delta\widehat{A}(T_j | \mathbf{x}_0) \bigr).
+$$
+
+```{r}
+tirec <- tire[tire$Censor == 1,]
+tiret <- tirec[order(tirec$Survival),]
+betasmod <- c(as.numeric(mod$coefficients))
+
+hatA <- function(tiret, betas) {
+  Amod <- c()
+  for (i in length(unique(tiret$Survival))) {
+    Amoddenom <- c()
+    for (j in 1:ncol(tiret)) {
+      Amoddenom[j] <- exp(c(t(betas) * tiret[i,j]))
+    }
+    Amod[i] <- 1/sum(Amoddenom)
+  }
+}
+```
+
+
+```{r}
+survival <- tire$Survival*tire$Censor
+survivalcensored <- sort(c(survival[survival > 0]))
+tirebeta <- tire[survival > 0,1:7]
+tirebetasign <- tire[survival > 0,c(2,3,5,7)]
+betasmod <- c(as.numeric(mod$coefficients))
+betasmodsign <- c(as.numeric(modsign$coefficients))
+
+hatA <- function(tireb, betas, survivalc = survivalcensored) {
+  Amod <- c()
+  for (i in 1:length(survivalc)) {
+    Amoddenom <- c()
+    for (j in 1:ncol(tireb)) {
+      Amoddenom[j] <- exp(c(t(betas) * tireb[i,j]))
+    }
+    Amod[i] <- 1/sum(Amoddenom)
+  }
+  print(Amod)
+  A <- c()
+  for (i in 1:length((unique(survivalc)))) {
+    if (length((survivalc)[(survivalc) == (unique(survivalc))[i]]) > 1) {
+      A[i] <- sum(Amod[(survivalc) == (unique(survivalc))[i]])/length((survivalc)[(survivalc) == (unique(survivalc))[i]])
+    } else {
+      A[i] <- Amod[(survivalc) == unique(survivalc)[i]]
+    }
+  }
+  return(cumsum(A * exp(sum(t(betas)))))
+}
+deltahatA <- hatA(tirebeta[],betasmod)
+deltahatAsign <- hatA(tirebetasign,betasmodsign)
+
+plot(stepfun(survivalcensored,c(0,deltahatA)),xlim=c(0,1.3))
+lines(stepfun(survivalcensored,c(0,deltahatAsign)))
+```
+
+```{r}
+plot(stepfun(survivalcensored,c(1,cumprod(1-deltahatA))),xlim=c(0,1.3))
+lines(stepfun(survivalcensored,c(1,cumprod(1-deltahatAsign))))
+```
+
+\newpage
+
+## c)
+
+Now, using the R function *survreg*, we will redo the two analysis in a) using a Weibull regression model. Then we will transform the estimated parameter values so that they have the same interpretation as for the Cox regression models.
+
+```{r}
+modwei <- survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(modwei)
+
+modsignwei <- survreg(Surv(Survival, Censor) ~ Wedge + Inter + Peel + WxP, tire)
+summary(modsignwei)
+```
+
+```{r}
+weib.coef.ph <- -modwei$coef[2:8]/modwei$scale
+coxph.coef <- mod$coef
+weib.coef.ph.sign <- -modsignwei$coef[2:5]/modsignwei$scale
+coxph.coef.sign <- modsign$coef
+
+data.frame(weib.coef.ph, coxph.coef)
+data.frame(weib.coef.ph.sign, coxph.coef.sign)
+```
+
+\newpage
+
+## d)
+
+$$
+\begin{aligned}
+S(t) &= e^{- \int_0^t \alpha(s) ds} \\
+  &= e^{- \int_0^t \alpha_0(s)r(\beta) ds} \\
+  &= e^{-r(\beta)\int_0^t \alpha_0(s) ds} \\
+  &= e^{-r(\beta) \cdot (-log(1-F(t)))} \\
+  &= e^{r(\beta) \cdot log(1-F(t))} \\
+  &= e^{e^{\beta^T} \cdot pweibull(t, \ shape, \ scale, \ lower=F, \ log=T)}, \text{from the documentation of the Weibull distribution in R} \\
+\end{aligned}
+$$
+
+```{r}
+t = seq(0,1.3,.01)
+plot(t,exp(exp(sum(weib.coef.ph)) * pweibull(t,shape = 1/(modwei$scale), scale = exp(as.numeric(modwei$coef[1])),lower=F,log=T)),type="l", col = "blue")
+lines(t,exp(exp(sum(weib.coef.ph.sign)) * pweibull(t,shape = 1/(modsignwei$scale), scale = exp(as.numeric(modsignwei$coef[1])),lower=F,log=T)), col = "red")
+```
+
+Also, the martingale residuals are given by,
+
+$$
+\tag{1.4}
+\widehat{M}_i = \widehat{M}_i(\tau) = N_i(\tau) - \widehat{\Lambda}_i(\tau),
+$$
+
+where $\widehat{\Lambda}_i(t)$, the estimated cumulative intensity process, is given by,
+
+$$
+\tag{1.5}
+\widehat{\Lambda}_i(\tau) = \sum_{T_j \le \tau}\frac{Y_i(T_j)r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_i(T_j))}{\sum_{l \in \Re_j} r(\widehat{\boldsymbol{\beta}}, \mathbf{x}_l(T_j))},
+$$
+
+and $N_i(\tau)$
+
+\newpage
+
+## e)
+
+When using backward elimination process, we first begin with fitting the full model, and then subsequently removing the variable with the highest p-value, until we have only significant variables left (p-value smaller than 0.05).
+
+```{r}
+modweielim1 <- survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+summary(modweielim1)$table
+modweielim2 <- update(modweielim1, . ~ Wedge + Inter + EB2B + Peel + Carbon + WxP)
+summary(modweielim2)$table
+modweielim3 <- update(modweielim1, . ~ Wedge + Inter + Peel + Carbon + WxP)
+summary(modweielim3)$table
+modweielim4 <- update(modweielim1, . ~ Wedge + Inter + Peel + WxP)
+summary(modweielim4)$table
+class(modweielim4)
+predict(modweielim4,tire)
+mean(predict(modweielim4))
+```
+
+
+\newpage
+
+# Problem 2:
+
+## Introduction
+
+## a)
+
+```{r}
+sim2a <- function(tire, modweielim4, seed = 98) {
+  set.seed(seed)
+  logu <- log(1 - runif(nrow(tire)))
+  
+  a = 1/(modweielim4$scale)
+  sigma <- exp(as.numeric(modweielim4$coef[1]))
+  K <- t(as.numeric(coef(modweielim4)[-c(1,6)])) * tire[,-c(1,4,6,8,9)]
+  
+  # Calc. survival times from Eq. (2.7)
+  TT <- c()
+  for (i in 1:nrow(tire)) {
+    TT[i] <- (-((sigma^a)/exp(sum(K[i,]))) * logu)^(1/a)
+  }
+  TT
+  # Calc. censoring times from Eq. (2.8)
+  C <- -(1/1) * logu
+  tildeTT <- c()
+  D <- c()
+  for (i in 1:nrow(tire)) {
+    # Finding the right censored survival times from Eq. (2.3)
+    tildeTT[i] <- min(TT[i], C[i])
+    # Finding the censoring indicators from Eq. (2.4)
+    ifelse(TT[i] <= C[i], D[i] <- 1, D[i] <- 0)
+  }
+  # Sorting them in correct order
+  tildeT <- sort(tildeTT)
+  D <- D[order(tildeTT)]
+  return(list(tildeT, D))
+}
+
+
+fun2a <- function(tire, modweielim4, seed = 98) {
+  set.seed(seed)
+  survivaltimes <- rweibull(nrow(tire),1/(modweielim4$scale),exp(as.numeric(modweielim4$coef[1])))  * exp(sum(t(as.numeric(coef(modweielim4))) * tire[,-c(1,4,6,8,9)]))
+  rweibull(nrow(tire),1/(modweielim4$scale),exp(.25))
+  censoredtimes <- rexp(nrow(tire),.5)
+  tildeTT <- c()
+  D <- c()
+  
+  for (i in 1:nrow(tire)) {
+    tildeTT[i] <- min(survivaltimes[i], censoredtimes[i])
+    
+    ifelse(survivaltimes[i] <= censoredtimes[i], D[i] <- 1, D[i] <- 0)
+  }
+  tiresim <- data.frame(survivaltimes, D)
+  print(sum(D[D==1]))
+  return(tiresim)
+}
+fun2a(tire,modweielim4)
+
+# mean(rweibull(nrow(tire),1/(modweielim4$scale),exp(.1)))
+# var(rweibull(nrow(tire),1/(modweielim4$scale),exp(.1)))
+```
+
+## b)
+
+```{r}
+
+fun2b <- function(full_model) {
+  model <- full_model
+  finished <- F
+  while (finished == F) {
+    model_summary <- data.frame(t(summary(model)$table[,4]))
+    model_summary <- model_summary[,-c(1,ncol(model_summary))]
+    if (max(model_summary) > .05) {
+      model_summary <- model_summary[-max.col(model_summary)]
+      model <- update(model, as.formula(paste(".~", paste(colnames(model_summary), collapse= "+"))))
+    } else {
+      final_model <- update(model, update(model, as.formula(paste(".~", paste(colnames(model_summary), collapse= "+")))))
+      finished <- T
+    }
+  }
+  return(summary(final_model)$table)
+}
+
+full_model <- survreg(Surv(Survival, Censor) ~ Age + Wedge + Inter + EB2B + Peel + Carbon + WxP, tire)
+fun2b(full_model)
+```
+
+
+## c)

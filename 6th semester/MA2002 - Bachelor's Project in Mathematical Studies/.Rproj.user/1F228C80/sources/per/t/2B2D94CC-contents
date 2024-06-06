@@ -1,0 +1,316 @@
+---
+title: <div align="center">Bachelor Code</div>
+author: "Ola Rasmussen"
+output:
+  pdf_document:
+  html_document:
+    df_print: paged
+fontsize: 12pt
+mainfont: Times New Roman
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, fig.align = "center", tidy.opts = list(width.cutoff = 60))
+
+library("tidyverse")
+library("aod")
+library("lmtest")
+library("readxl")
+library("VGAM")
+library("broom")
+library("ggfortify")
+library("MASS")
+library("dampack")
+library("mdscore")
+library("formatR")
+library("glmmTMB")
+library("TMB")
+library("stringr")
+library("pals")
+library("teamcolors")
+library("corrplot")
+library("lmtest")
+```
+
+```{r eval=FALSE}
+# Algorithm to create the dataframe as shown in Section 3.2
+fun <- function(data_file,dates_file,covid = 0) {
+  unik <- unique(data_file$GAME_DATE)
+  df_temp <- data.frame()
+  for (i in 1:length(unik)) {
+    df <- data.frame()
+    home <- data.frame()
+    away <- data.frame()
+    df <- data_file[data_file$GAME_DATE == unik[i],]
+    for (j in 1:nrow(df)) {
+      home <- dplyr::filter(df, grepl("vs.", MATCH_UP))
+    }
+    for (j in 1:nrow(df)) {
+      away <- dplyr::filter(df, grepl("@", MATCH_UP))
+    }
+    for (j in 1:nrow(home)) {
+      df_temp <- rbind(df_temp, home[j,])
+      df_temp <- rbind(df_temp, dplyr::filter(away, grepl(home[j,1], MATCH_UP)))
+    }
+  }
+  dates <- c()
+  for (i in 1:nrow(dates_file)) {
+    for (j in 1:2) {
+      dates <- append(dates,as.character(dates_file$DATE[i]))
+    }
+  }
+  df_temp$GAME_DATE <- as.Date(dates)
+  real_dates <- df_temp$GAME_DATE
+  real_dates_u <- unique(real_dates)
+  dates_since <- (real_dates - as.Date("2014-10-28"))+1
+  df_temp$GAME_DATE <- dates_since
+  real_dates <- df_temp$GAME_DATE
+  real_dates_u <- unique(real_dates)
+  teams <- c("Atlanta Hawks", "Boston Celtics", "Brooklyn Nets", "Charlotte Hornets", "Chicago Bulls", "Cleveland Cavaliers", "Dallas Mavericks", "Denver Nuggets", "Detroit Pistons", "Golden State Warriors", "Houston Rockets", "Indiana Pacers", "Los Angeles Clippers", "Los Angeles Lakers", "Memphis Grizzlies", "Miami Heat", "Milwaukee Bucks", "Minnesota Timberwolves", "New Orleans Pelicans", "New York Knicks", "Oklahoma City Thunder", "Orlando Magic", "Philadelphia 76ers", "Phoenix Suns", "Portland Trail Blazers", "Sacramento Kings", "San Antonio Spurs", "Toronto Raptors", "Utah Jazz", "Washington Wizards")
+  abr <- c("ATL","BOS","BKN","CHA","CHI","CLE","DAL","DEN","DET","GSW","HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN","NOP","NYK","OKC","ORL","PHI","PHX","POR","SAC","SAS","TOR","UTA","WAS")
+  dates_file$DATE <- (as.Date(dates_file$DATE) - as.Date("2014-10-28"))+1
+  fans <- c()
+  for (i in real_dates_u) {
+    unik_df_temp <- df_temp[df_temp$GAME_DATE == i,]
+    home <- data.frame()
+    home <- dplyr::filter(unik_df_temp, grepl("vs.", MATCH_UP))
+    unik_dates <- dates_file[dates_file$DATE == i,]
+    for (j in 1:nrow(unik_dates)) {
+      fansno <- fans
+      fans <- append(fans,unik_dates[unik_dates$HOME == teams[abr == home[j,]$TEAM],]$N.FANS)
+      fans <- append(fans,unik_dates[unik_dates$HOME == teams[abr == home[j,]$TEAM],]$N.FANS)
+    }
+    if (length(fansno) == length(fans)) {
+      print(i)
+      # break
+    }
+  }
+  df_temp$N.FANS <- fans
+  # dates_since <- seq(1:length(real_dates_u))
+  # for (i in 1:length(real_dates_u)) {
+  #   real_dates[real_dates == real_dates_u[i]] <- dates[i]
+  # }
+  # df_temp$GAME_DATE <- real_dates
+  df <- data.frame(matrix(ncol = 9, nrow = nrow(data_file)*3))
+  colnames(df) <- c("ATTACK", "DEFENCE", "y", "TYPE", "HOME", "DATE", "WIN", "COVID", "N.FANS")
+  df$TYPE <- rep(c(3,2,1), nrow(data_file))
+  ifelse(covid == 0, df$COVID <- "no", df$COVID <- "yes")
+  attack <- c()
+  for (i in 1:30) {
+    attack <- append(attack, rep(unique(df_temp$TEAM)[i], nrow(data_file)/10))
+  }
+  df$ATTACK <- attack
+  for (i in unique(attack)) {
+    defence <- c()
+    for (j in 1:(nrow(data_file)/30)) defence <- append(defence, rep(df_temp[df_temp$TEAM == i,]$MATCH_UP[j], 3))
+    df[df$ATTACK == i,]$DEFENCE[1:(nrow(data_file)/10)] <- defence
+    scores <- c()
+    for (j in 1:(nrow(data_file)/30)) scores <- append(scores, c(df_temp[df_temp$TEAM == i,]$"3PM"[j], df_temp[df_temp$TEAM == i,]$"FGM"[j] - df_temp[df_temp$TEAM == i,]$"3PM"[j], df_temp[df_temp$TEAM == i,]$"FTM"[j]))
+    df[df$ATTACK == i,]$y[1:(nrow(data_file)/10)] <- scores
+    date <- c()
+    for (j in 1:(nrow(data_file)/30)) date <- append(date, rep(as.numeric(df_temp[df_temp$TEAM == i,]$GAME_DATE[j]), 3))
+    df[df$ATTACK == i,]$DATE[1:(nrow(data_file)/10)] <- date
+    win <- c()
+    for (j in 1:(nrow(data_file)/30)) win <- append(win, rep(df_temp[df_temp$TEAM == i,]$RESULT[j], 3))
+    df[df$ATTACK == i,]$WIN[1:(nrow(data_file)/10)] <- win
+  }
+  for (i in 1:nrow(df)) {
+    ifelse(str_detect(df$DEFENCE[i], "vs.") == T, df$HOME[i] <- "yes", df$HOME[i] <- "no")
+    ifelse(str_detect(df$WIN[i], "W") == T, df$WIN[i] <- "yes", df$WIN[i] <- "no")
+    sub("........", "", df$DEFENCE[i])
+  }
+  for (i in 1:30) {
+    unik_dato_lag <- df[df$ATTACK == abr[i],]
+    fans_unik_dato <- data.frame()
+    fans_unik_dato <- dplyr::filter(df_temp, grepl(abr[i], TEAM))
+    unike_dato <- unik_dato_lag$DATE
+    fan <- c()
+    for (j in 1:length(unique(unike_dato))) {
+      fan <- c(fan,fans_unik_dato$N.FANS[j])
+      fan <- c(fan,fans_unik_dato$N.FANS[j])
+      fan <- c(fan,fans_unik_dato$N.FANS[j])
+    }
+    df[df$ATTACK == abr[i],]$N.FANS <- fan
+  }
+  df$DEFENCE <- str_sub(df$DEFENCE,-3,-1)
+  df$ATTACK <- as.factor(df$ATTACK)
+  df$DEFENCE <- as.factor(df$DEFENCE)
+  df$y <- as.numeric(df$y)
+  df$TYPE <- as.factor(df$TYPE)
+  df$HOME <- as.factor(df$HOME)
+  df$DATE <- numFactor(df$DATE)
+  df$WIN <- as.factor(df$WIN)
+  df$COVID <- as.factor(df$COVID)
+  df$N.FANS <- as.numeric(df$N.FANS)
+  return(df)
+}
+box_score_22_23_season <- fun(read_excel("FILES/box_score_22_23_season.xlsx"),
+                              read_excel("FILES/dates_fans_22_23_season.xlsx"))
+box_score_21_22_season <- fun(read_excel("FILES/box_score_21_22_season.xlsx"),
+                              read_excel("FILES/dates_fans_21_22_season.xlsx"))
+box_score_20_21_season <- fun(read_excel("FILES/box_score_20_21_season.xlsx"),
+                              read_excel("FILES/dates_fans_20_21_season.xlsx"),covid = 1)
+box_score_18_19_season <- fun(read_excel("FILES/box_score_18_19_season.xlsx"),
+                              read_excel("FILES/dates_fans_18_19_season.xlsx"))
+box_score_17_18_season <- fun(read_excel("FILES/box_score_17_18_season.xlsx"),
+                              read_excel("FILES/dates_fans_17_18_season.xlsx"))
+box_score_16_17_season <- fun(read_excel("FILES/box_score_16_17_season.xlsx"),
+                              read_excel("FILES/dates_fans_16_17_season.xlsx"))
+box_score_15_16_season <- fun(read_excel("FILES/box_score_15_16_season.xlsx"),
+                              read_excel("FILES/dates_fans_15_16_season.xlsx"))
+box_score_14_15_season <- fun(read_excel("FILES/box_score_14_15_season.xlsx"),
+                              read_excel("FILES/dates_fans_14_15_season.xlsx"))
+box_score <- rbind(box_score_14_15_season,
+                   box_score_15_16_season,
+                   box_score_16_17_season,
+                   box_score_17_18_season,
+                   box_score_18_19_season,
+                   box_score_20_21_season,
+                   box_score_21_22_season,
+                   box_score_22_23_season)
+mod.F <- glmmTMB(y ~ 1, box_score, poisson, REML=F)
+```
+
+```{r}
+# Selecting the best model versus these:
+mod.Covid.1 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:COVID + HOME:COVID:TYPE + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.2 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.3 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + COVID + HOME:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.4 <- update(mod.F, .~ 0 + TYPE + HOME + TYPE:COVID + HOME:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.5 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.6 <- update(mod.F, .~ 0 + TYPE + HOME + COVID + HOME:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.7 <- update(mod.F, .~ 0 + TYPE + HOME + TYPE:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Covid.8 <- update(mod.F, .~ 0 + TYPE + HOME + COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+
+# Comparing
+round(AIC(mod.Covid.1))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.2))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.3))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.4))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.5))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.6))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.7))-round(AIC(mod.Best.F))
+round(AIC(mod.Covid.8))-round(AIC(mod.Best.F))
+
+# Testing mod.Covid.1 vs. mod.Best.F via LRT because they had same AIC
+anova(mod.Best.F,mod.Covid.1)
+```
+
+```{r}
+# The best models when REML = F and REML = T
+mod.Best.F <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:COVID + HOME:COVID + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+# summary(mod.Best.F)
+```
+
+```{r}
+estimates.SD <- round(cbind((summary(mod.Best.F)$coef$cond[,1]), (summary(mod.Best.F)$coef$cond[,2])),4)
+colnames(estimates.SD) <- c("Estimate", "Std. Error")
+estimates.SD
+
+estimates.SD.exp <- round(exp(cbind((summary(mod.Best.F)$coef$cond[,1]), (summary(mod.Best.F)$coef$cond[,2]))),4)
+colnames(estimates.SD.exp) <- c("Estimate", "Std. Error")
+estimates.SD.exp
+```
+
+```{r fig.height=10, fig.width=10}
+# Correlation Table
+rf.mod.Best.F <- ranef(mod.Best.F)
+cortable <- cbind(rf.mod.Best.F$cond$ATTACK,rf.mod.Best.F$cond$DEFENCE)
+colnames(cortable) <- c("Attack Type 1","Attack Type 2","Attack Type 3", "Defence Type 1","Defence Type 2","Defence Type 3")
+plot(cortable, col = league_pal("nba"), cex = 1.5, cex.axis = .8, pch = 19)
+```
+
+```{r fig.height=4, fig.width=10}
+# Random Effects
+rf.mod.Best.F <- ranef(mod.Best.F)
+barplot(rf.mod.Best.F$cond$ATTACK$TYPE1, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.F$cond$ATTACK$TYPE2, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.F$cond$ATTACK$TYPE3, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$ATTACK), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.F$cond$DEFENCE$TYPE1, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.F$cond$DEFENCE$TYPE2, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))
+barplot(rf.mod.Best.F$cond$DEFENCE$TYPE3, col = league_pal("nba"), names.arg = rownames(rf.mod.Best.F$cond$DEFENCE), cex.names = .5, ylim = c(-.3,.3))
+```
+
+```{r}
+# Selecting the best model versus these:
+mod.Fans.1 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:N.FANS + HOME:N.FANS:TYPE + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.2 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.3 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + N.FANS + HOME:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.4 <- update(mod.F, .~ 0 + TYPE + HOME + TYPE:N.FANS + HOME:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.5 <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.6 <- update(mod.F, .~ 0 + TYPE + HOME + N.FANS + HOME:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.7 <- update(mod.F, .~ 0 + TYPE + HOME + TYPE:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+mod.Fans.8 <- update(mod.F, .~ 0 + TYPE + HOME + N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+
+# Comparing
+round(AIC(mod.Fans.1))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.2))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.3))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.4))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.5))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.6))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.7))-round(AIC(mod.Best.Fans.F))
+round(AIC(mod.Fans.8))-round(AIC(mod.Best.Fans.F))
+```
+
+
+```{r}
+# The best model using fans for REML = F
+mod.Best.Fans.F <- update(mod.F, .~ 0 + TYPE + TYPE:HOME + TYPE:N.FANS + HOME:N.FANS + (TYPE + 0|ATTACK) + (TYPE + 0|DEFENCE))
+# summary(mod.Best.Fans.F)
+
+estimates.SD.Fans <- round(cbind((summary(mod.Best.Fans.F)$coef$cond[,1]), (summary(mod.Best.Fans.F)$coef$cond[,2])),10)
+colnames(estimates.SD.Fans) <- c("Estimate", "Std. Error")
+estimates.SD.Fans
+
+estimates.SD.exp.Fans <- round(exp(cbind((summary(mod.Best.Fans.F)$coef$cond[,1]), (summary(mod.Best.Fans.F)$coef$cond[,2]))),10)
+colnames(estimates.SD.exp.Fans) <- c("Estimate", "Std. Error")
+estimates.SD.exp.Fans
+```
+
+```{r fig.height=10}
+# Extending the best model with OU process
+mod.OU.F <- update(mod.F, . ~ 0 + TYPE + TYPE:HOME + TYPE:COVID + HOME:COVID + ou(DATE+0|ATTACK:TYPE) + ou(DATE+0|DEFENCE:TYPE))
+# summary(mod.OU.F)
+
+estimates.SD.OU <- round(cbind((summary(mod.OU.F)$coef$cond[,1]), (summary(mod.OU.F)$coef$cond[,2])),4)
+colnames(estimates.SD.OU) <- c("Estimate", "Std. Error")
+estimates.SD.OU
+
+estimates.SD.exp.OU <- round(exp(cbind((summary(mod.OU.F)$coef$cond[,1]), (summary(mod.OU.F)$coef$cond[,2]))),4)
+colnames(estimates.SD.exp.OU) <- c("Estimate", "Std. Error")
+estimates.SD.exp.OU
+```
+
+
+```{r fig.height=4, fig.width=10}
+rf.mod.OU.F <- ranef(mod.OU.F)
+one_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(1,by = 3,length.out = 30),]
+two_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(2,by = 3,length.out = 30),]
+thr_p_A.OU.F <- rf.mod.OU.F$cond$`ATTACK:TYPE`[seq(3,by = 3,length.out = 30),]
+plot(1:ncol(one_p_A.OU.F),one_p_A.OU.F[1,], col = league_pal("nba")[1],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+for (i in 2:30) {
+  lines(1:ncol(one_p_A.OU.F),one_p_A.OU.F[i,], col = league_pal("nba")[i])
+}
+plot(1:ncol(two_p_A.OU.F),two_p_A.OU.F[1,], col = league_pal("nba")[1],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+for (i in 2:30) {
+  lines(1:ncol(two_p_A.OU.F),two_p_A.OU.F[i,], col = league_pal("nba")[i])
+}
+plot(1:ncol(thr_p_A.OU.F),thr_p_A.OU.F[1,], col = league_pal("nba")[1],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+for (i in 2:30) {
+  lines(1:ncol(thr_p_A.OU.F),thr_p_A.OU.F[i,], col = league_pal("nba")[i])
+}
+```
+
+```{r fig.height=4, fig.width=10}
+plot(1:ncol(two_p_A.OU.F),two_p_A.OU.F[10,], col = league_pal("nba")[10],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+abline(h = 0)
+plot(1:ncol(thr_p_A.OU.F),thr_p_A.OU.F[10,], col = league_pal("nba")[10],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+abline(h = 0)
+
+plot(1:ncol(two_p_A.OU.F),two_p_A.OU.F[11,], col = league_pal("nba")[11],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+abline(h = 0)
+plot(1:ncol(thr_p_A.OU.F),thr_p_A.OU.F[11,], col = league_pal("nba")[11],type="l",ylim=c(-.6,.6), xlab = "Days after 27.10.14 while the season is active",ylab="")
+abline(h = 0)
+```
+

@@ -1,0 +1,310 @@
+---
+title: "TMA4300 MCMC Practice Solutions"
+author: "John Paige"
+output: pdf_document
+header-includes:
+  - \geometry{top=1in}
+  - \usepackage{titling}
+  - \pretitle{\begin{flushleft}\Huge\bfseries}
+  - \posttitle{\end{flushleft}}  
+  - \preauthor{\begin{flushleft}\Large}
+  - \postauthor{\end{flushleft}}  
+  - \predate{\begin{flushleft}\large}
+  - \postdate{\end{flushleft}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\textit{The document is intended as a tool for students to practice coding up their own MCMC sampler. Students are welcome to work together in groups, and to ask questions as they progress in this worksheet. When coding, students should take turns:}
+\begin{enumerate}
+\item \textit{coding up various components of the samplers, and }
+\item \textit{looking over and double checking other group members' code as it is being written.}
+\end{enumerate}
+\textit{Make sure your code is well commented and has understandable variable and function names.}
+
+Assume we are interested in the response, relative to a baseline, of a patient after being assigned to one of two groups. We have $n$ patients in a treatment group that receive medication for a condition, and $n$ other patients in a control group that receive a placebo. Measurements are obtained for the $n$ patients in each group, denoted by $Y_{Ti}$ and $Y_{Ci}$ for the treatment and control groups respectively, and for $i=1,2,\ldots,n$.
+
+The responses are modeled as, for $G \in \{T, C\}$ denoting the patient group, 
+$$ Y_{Gi} = \mu_G + \epsilon_{Gi}, $$
+where we model $\mu_G$ as a Gaussian latent effect with prior $\mu_T, \mu_C \mid \nu^2 \stackrel{iid}{\sim} N(0, \nu^2)$, we assume Gaussian error, $\epsilon_{Ti}, \epsilon_{CI} \mid \nu^2 \stackrel{iid}{\sim} N(0, \sigma^2)$ for $i=1,\ldots,n$, and we place inverse gamma hyperpriors on both $\sigma^2$ and $\nu^2$ so that $\sigma^2, \nu^2 \stackrel{iid}{\sim} \mbox{Inv-Gamma}(\alpha, \beta)$. Hence, our hyperpriors have density:
+\begin{align*}
+p(\sigma^2) &= \frac{\beta^\alpha}{\Gamma(\alpha)} (1/\sigma^2)^{\alpha + 1} \exp \{-\beta/\sigma^2\} \\
+p(\nu^2) &= \frac{\beta^\alpha}{\Gamma(\alpha)} (1/\nu^2)^{\alpha + 1} \exp \{-\beta/\nu^2\}.
+\end{align*}
+Let $\boldsymbol{Y}_T = Y_{T1},\ldots,Y_{Tn}$ and $\boldsymbol{Y}_C = Y_{C1},\ldots,Y_{Cn}$.
+
+# 1
+Draw a conditional dependency graph for $\boldsymbol{Y}_T$, $\boldsymbol{Y}_C$, $\mu_T$, $\mu_C$, $\sigma^2$, and $\nu^2$. \textit{(Why can we ignore the $\epsilon$ terms here?)}
+
+We can ignore the $\epsilon$ terms since we are already considering as random $\boldsymbol{Y}_T$, $\boldsymbol{Y}_C$, $\mu_T$, and $\mu_C$, and $\epsilon_{Gi} = Y_{Gi} - \mu_G$, so there are no additional degrees of freedom for the $\epsilon$ terms. We are reparameterizing in terms of $Y$ rather than $\epsilon$.
+
+Dependency graph drawn in the notes on Blackboard.
+
+# 2
+Give an expression that the posterior density, $p(\mu_T, \mu_C, \sigma^2, \nu^2 \mid \boldsymbol{Y}_T, \boldsymbol{Y}_C)$, is proportional to, removing unnecessary multiplicative constants. Make sure to factor out the final result into contributions due to the likelihood, latent effects, and hyperpriors.
+
+Answer:
+
+\begin{align*}
+p(\mu_T, \mu_C, \sigma^2, \nu^2 \mid \boldsymbol{Y}_T, \boldsymbol{Y}_C) &\propto p(\boldsymbol{Y}_T, \boldsymbol{Y}_C \mid \mu_T, \mu_C, \sigma^2, \nu^2) \times p(\mu_T, \mu_C \mid \sigma^2, \nu^2) \times p(\sigma^2, \nu^2) \\
+&= \underbrace{p(\boldsymbol{Y}_T\mid \mu_T, \sigma^2) p(\boldsymbol{Y}_C \mid \mu_C, \sigma^2)}_{\text{likelihood}} \times \underbrace{p(\mu_T \mid \nu^2) p(\mu_C \mid \nu^2)}_{\text{latent effects}} \times \underbrace{p(\sigma^2) p(\nu^2)}_{\text{hyperpriors}} \\
+&= \left \{ \prod_{i=1}^n p(Y_{Ti} \mid \mu_T, \sigma^2) p(Y_{Ci} \mid \mu_C, \sigma^2) \right \} \left \{ p(\mu_T \mid \nu^2) p(\mu_C \mid \nu^2) \right \} \left \{ p(\sigma^2) p(\nu^2) \right \} \\
+&\propto \left \{ \prod_{i=1}^n \frac{1}{\sigma^2} \exp\{-\frac{1}{2\sigma^2} [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2]\} \right \} \times \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\times \left \{ \left (\frac{1}{\sigma^2 \nu^2} \right)^{\alpha + 1} \exp \{-\beta(1/\sigma^2 + 1/\nu^2)\} \right \} \\
+&= \left \{ \frac{1}{\sigma^{2n}} \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\times \left \{ \left (\frac{1}{\sigma^2 \nu^2} \right)^{\alpha + 1} \exp \{-\beta(1/\sigma^2 + 1/\nu^2)\} \right \}
+\end{align*}
+
+# 3
+Find the conditional density $p(\nu^2 \mid \mu_T, \mu_C, \sigma^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C)$ and simplify it, removing unnecessary multiplicative constants and combining exponential terms. Name the distribution and provide its parameters.
+
+Do the same for $p(\sigma^2 \mid \mu_T, \mu_C, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C)$ (and, optionally, for $p(\mu_T, \mu_C \mid \sigma^2, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C)$).
+
+Answer:
+
+\begin{align*}
+p(\nu^2 \mid \mu_T, \mu_C, \sigma^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C) &\propto \left \{ \frac{1}{\sigma^{2n}} \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\times \left \{ \left (\frac{1}{\sigma^2 \nu^2} \right)^{\alpha + 1} \exp \{-\beta(1/\sigma^2 + 1/\nu^2)\} \right \} \\
+&\propto \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \left \{ \left (\frac{1}{\nu^2} \right)^{\alpha + 1} \exp \{-\beta/\nu^2\} \right \} \\
+&= \left (\frac{1}{\nu^2} \right)^{(\alpha + 1) + 1} \exp \left \{-\left(\beta + \frac{1}{2} (\mu_T^2 + \mu_C^2) \right)\frac{1}{\nu^2} \right \}.
+\end{align*}
+This is proportional to the kernel of an inverse gamma distribution with parameters $\alpha + 1$ and $\beta + \frac{1}{2} (\mu_T^2 + \mu_C^2)$, so:
+$$ \nu^2 \mid \mu_T, \mu_C, \sigma^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C \sim \mbox{Inv-Gamma}(\alpha+1, \beta + \frac{1}{2} (\mu_T^2 + \mu_C^2)). $$
+
+
+\begin{align*}
+p(\sigma^2 \mid \mu_T, \mu_C, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C) &\propto \left \{ \frac{1}{\sigma^{2n}} \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\times \left \{ \left (\frac{1}{\sigma^2 \nu^2} \right)^{\alpha + 1} \exp \{-\beta(1/\sigma^2 + 1/\nu^2)\} \right \} \\
+&\propto \left \{ \frac{1}{\sigma^{2n}} \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{ \left (\frac{1}{\sigma^2} \right)^{\alpha + 1} \exp \{-\beta/\sigma^2\} \right \} \\
+&= \left(\frac{1}{\sigma^{2}} \right)^{n + \alpha + 1} \exp\Big \{-\beta/\sigma^2 -\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \\
+&= \left(\frac{1}{\sigma^{2}} \right)^{n + \alpha + 1} \exp\left \{- \left( \beta + \frac{1}{2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \right) \frac{1}{\sigma^2} \right \}.
+\end{align*}
+This is the kernel of an inverse gamma distribution with parameters $\alpha+n$ and $\beta + \frac{1}{2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2]$. Hence, 
+$$ \sigma^2 \mid \mu_T, \mu_C, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C \sim \mbox{Inv-Gamma}(\alpha+n, \beta + \frac{1}{2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2]). $$
+\textbf{Note:} the inverse gamma prior is conjugate to the Gaussian likelihood provided the mean is known (as given in Lecture 7), and we are conditioning on $\mu_T$ and $\mu_C$ (and we know \textit{a priori} that the mean of $\mu_T$ and $\mu_C$ are 0), so we know the Gaussian mean in both conditionals. Hence, from the outset it should be clear that the $\sigma^2$ and $\nu^2$ conditionals will be inverse gamma.
+
+\begin{align*}
+p(\mu_T, \mu_C \mid \sigma^2, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C) &\propto \left \{ \frac{1}{\sigma^{2n}} \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{ \frac{1}{\nu^2} \exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\times \left \{ \left (\frac{1}{\sigma^2 \nu^2} \right)^{\alpha + 1} \exp \{-\beta(1/\sigma^2 + 1/\nu^2)\} \right \} \\
+&\propto \left \{ \exp\Big \{-\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \} \right \} \times \left \{\exp\{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) \} \right \} \\
+&\propto \exp\Big \{-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) -\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \Big \}.
+\end{align*}
+Now, 
+\begin{align*}
+\exp\{-\frac{1}{2\nu^2} \mu_T^2 -\frac{1}{2\sigma^2} \sum_{i=1}^n (Y_{Ti} - \mu_T)^2\} &\propto \exp \{-\frac{1}{2\nu^2} \mu_T^2 -\frac{1}{2\sigma^2} \sum_{i=1}^n [- 2 Y_{Ti} \mu_T + \mu_T^2] \} \\
+&= \exp \left \{-\left(\frac{1}{2\nu^2} + \frac{n}{2\sigma^2}\right) \mu_T^2 + 2\left(\frac{1}{2\sigma^2} \sum_{i=1}^n Y_{Ti} \right) \mu_T \right\} \\
+&\propto \exp \left \{-\left(\frac{1}{2\nu^2} + \frac{n}{2\sigma^2}\right) \left( \mu_T - \frac{2\left(\frac{1}{2\sigma^2} \sum_{i=1}^n Y_{Ti} \right)}{2 \left(\frac{1}{2\nu^2} + \frac{n}{2\sigma^2}\right)} \right)^2 \right\} \\
+&\propto \exp \left \{-\frac{1}{2} \frac{\sigma^2 + n\nu^2}{\nu^2\sigma^2} \left( \mu_T - \frac{\sum_{i=1}^n Y_{Ti} }{n + \frac{\sigma^2}{\nu^2}} \right)^2 \right\},
+\end{align*}
+which is the kernel of a Gaussian distribution with mean $\frac{\sum_{i=1}^n Y_{Ti} }{n + \frac{\sigma^2}{\nu^2}}$ and variance $\frac{\nu^2\sigma^2}{\sigma^2 + n\nu^2}$. Hence, $\mu_T \mid \sigma^2, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C \sim N\left(\frac{\sum_{i=1}^n Y_{Ti} }{n + \frac{\sigma^2}{\nu^2}}, \frac{\nu^2\sigma^2}{\sigma^2 + n\nu^2} \right)$ A similar argument shows $\mu_C \mid \sigma^2, \nu^2, \boldsymbol{Y}_C, \boldsymbol{Y}_C \sim N\left(\frac{\sum_{i=1}^n Y_{Ti} }{n + \frac{\sigma^2}{\nu^2}}, \frac{\nu^2\sigma^2}{\sigma^2 + n\nu^2} \right)$.
+
+\textbf{Note:} The fact that the conditional density $p(\mu_T, \mu_C \mid \sigma^2, \nu^2, \boldsymbol{Y}_T, \boldsymbol{Y}_C)$ can be factored into the form $f(\mu_T) \cdot f(\mu_C)$ implies $\mu_T$ and $\mu_C$ are conditionally independent given $\sigma^2, \nu, \boldsymbol{Y}_T$, and $\boldsymbol{Y}_C$ (also this should be clear from the dependence graph we drew earlier). The above conditional distributions for $\mu_T$ and $\mu_C$ should therefore be no surprise, since, conditional on the variance, $\nu^2$, a Gaussian prior is conjugate to a Gaussian likelihood.
+
+# 4
+Despite the fact that we could use a Gibbs step for every parameter due to the closed forms of the conditional distributions, assume we wish to take a bivariate Gaussian Metropolis step for the parameters $\mu_T$ and $\mu_C$ with step variance $\tau^2 I_2$ for $2 \times 2$ identity matrix $I_2$. We will let $\boldsymbol{x} = (\sigma^2, \nu^2, \mu_T, \mu_C)$ be the current state of our MCMC sampler so that $\boldsymbol{x}^j$ is the $j$-th element of $\boldsymbol{x}$.
+
+What is the \textbf{log} acceptance probability of the proposal $\boldsymbol{y} = (\sigma^2, \nu^2, \tilde{\mu}_T, \tilde{\mu}_C)$ where $\boldsymbol{y}^{3,4} \sim N_2(\boldsymbol{x}^{3,4}, \tau^2 I_2)$? Simplify the expression as much as possible.
+
+Answer:
+\begin{align*}
+\log \alpha(\boldsymbol{y} \mid \boldsymbol{x}) &= \min \left\{0, \log \left( \frac{p(\boldsymbol{y}^{3,4} \mid \boldsymbol{y}^{1, 2})}{p(\boldsymbol{x}^{3,4}, \mid \boldsymbol{x}^{1,2})} \frac{Q(\boldsymbol{x} \mid \boldsymbol{y})}{Q(\boldsymbol{y} \mid \boldsymbol{x})} \right) \right \} && \text{($Q$ symmetric)} \\
+&= \min \left\{0, \log p(\boldsymbol{y}^{3,4} \mid \boldsymbol{y}^{1, 2}) - \log p(\boldsymbol{x}^{3,4}, \mid \boldsymbol{x}^{1,2}) \right \} \\
+&= \min \bigg\{0, -\frac{1}{2\nu^2} (\tilde{\mu}_T^2 + \tilde{\mu}_C^2) -\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \tilde{\mu}_T)^2 + (Y_{Ci} - \tilde{\mu}_C)^2] \\
+&- \left (-\frac{1}{2\nu^2} (\mu_T^2 + \mu_C^2) -\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \mu_T)^2 + (Y_{Ci} - \mu_C)^2] \right) \bigg \}\\
+&= \min \left\{0, -\frac{1}{2\nu^2} (\tilde{\mu}_T^2 + \tilde{\mu}_C^2 - \mu_T^2 - \mu_C^2) -\frac{1}{2\sigma^2} \sum_{i=1}^n [(Y_{Ti} - \tilde{\mu}_T)^2 + (Y_{Ci} - \tilde{\mu}_C)^2 - (Y_{Ti} - \mu_T)^2 - (Y_{Ci} - \mu_C)^2] \right \}.
+\end{align*}
+No need to spend more time simplifying than this.
+
+
+# 5
+
+Now for the fun part: we will code up our own hybrid Metropolis-within-Gibbs MCMC sampler. We will let $\boldsymbol{x} = (\sigma^2, \nu^2, \mu_T, \mu_C)$ so that $x_i^j$ is the $j$-th element of the $i$-th sample from our MCMC sampler. The MCMC algorithm will proceed as follows:
+
+\begin{enumerate}
+\item Set $\boldsymbol{x} \leftarrow \boldsymbol{x}_0 \leftarrow (\sigma^2, \nu^2, \mu_T, \mu_C)$ to a reasonable initial value
+\item For $i$ in $1$ to $M$ iterations:
+\begin{enumerate}
+\item Gibbs step: set $x^1$ to a random draw from the conditional $x^1 \mid \boldsymbol{x}^{-1}, \boldsymbol{Y}_T, \boldsymbol{Y}_C$
+\item Gibbs step: set $x^2$ to a random draw from the conditional $x^2 \mid \boldsymbol{x}^{-2}, \boldsymbol{Y}_T, \boldsymbol{Y}_C$
+\item MH step: propose $\boldsymbol{y}^{3,4} \sim N_2(\boldsymbol{x}^{3,4}, \tau^2 I_2)$. Accept the proposal with the probability from problem 4, setting $\boldsymbol{x}^{3,4} \leftarrow \boldsymbol{y}^{3,4}$ if accept, or $\boldsymbol{x}^{3,4} \leftarrow \boldsymbol{x}_{i-1}^{3,4}$ if reject.
+\item Update current state: set $\boldsymbol{x}_i \leftarrow \boldsymbol{x}$
+\end{enumerate}
+\item return $\boldsymbol{x}_0, \ldots, \boldsymbol{x}_M$
+\end{enumerate}
+
+Assume $M=100000$ and remove 10000 samples due to burn-in. We will let the inverse gamma hyperprior parameters be $\alpha=2$ and $\beta=0.05$. Assume the following are our observations:
+
+```{r}
+library(invgamma)
+
+# simulate data based on true parameters
+alpha = 2
+beta = 0.05
+set.seed(1)
+sigma2 = rinvgamma(1, alpha, beta)
+nu2 = rinvgamma(1, alpha, beta)
+muT = rnorm(1, sd=sqrt(nu2))
+muC = rnorm(1, sd=sqrt(nu2))
+n=100
+YT = rnorm(n, muT, sd=sqrt(sigma2))
+YC = rnorm(n, muC, sd=sqrt(sigma2))
+
+# make dataset and a boxplot of the responses in the 2 groups
+dat = data.frame(Group=c(rep("Treatment", n), rep("Control", n)), Y=c(YT, YC))
+boxplot(Y ~ Group, data=dat, col="skyblue")
+```
+
+Construct you MCMC sampler. Decide on a reasonable starting value and a step size resulting in reasonably good mixing. Keep track of your acceptance probability, and report it. Make traceplots and histograms of all variables, and compare estimates of the mean of each distribution to the true values generated above. Has the chain converged? What do the results imply about the treatment? Does it significantly improve (increase) patient outcomes relative to the placebo?
+
+Answer:
+
+First we define a function for the acceptance probability, then we define a Metropolis-Hastings function for doing MCMC.
+```{r}
+
+# calculates the acceptance probability on a log scale. Unlike the notation in the solutions, 
+# I name variables "prop" instead of "tilde", since they are the proposed values.
+acceptProb = function(muTprop, muCprop, muT, muC, nu2, sigma2) {
+  firstTerm = (-0.5/nu2) * (muTprop^2 + muCprop^2 - muT^2 - muC^2)
+  secondTerm = (-0.5/sigma2) * sum((YT - muTprop)^2 + (YC - muCprop)^2 - (YT - muT)^2 - (YC - muC)^2)
+  min(c(1, exp(firstTerm + secondTerm)))
+}
+
+# function for doing Metropolis-Hastings. Keeps track of acceptance rate. 
+# returns:
+#     sampleMat: (M-burnin) x 4 matrix of samples 
+#     acceptRate: proportion of MH steps accepted
+MH = function(M=10000, burnin=2000, tau2=.1, printEvery=100, verbose=FALSE) {
+  # initialize matrix of samples and acceptances and x_0. Note indices start at 1 not 0
+  xmat = matrix(0, nrow=M+1, ncol=4)
+  xmat[1,] = c(1, 1, 0, 0)
+  accepts = rep(FALSE, M)
+  
+  # set current state (sigma2, nu2, muT, muC)
+  x = xmat[1,]
+  
+  # generate samples
+  startTime = proc.time()[3]
+  for(i in 1:M) {
+    if(((i %% printEvery) == 0) && verbose) {
+      # print current state and expected computation time left:
+      currState = paste(x, collapse=", ")
+      print(paste0("current state for iteration ", i, "/", M, ": ", currState))
+      
+      currTime = proc.time()[3]
+      timeTaken = currTime - startTime
+      fracDone = (i-1)/M
+      fracLeft = 1 - fracDone
+      timeLeftEst = (timeTaken / fracDone) * fracLeft
+      print(paste0("estimated time left: ", round(timeLeftEst), " seconds"))
+    }
+    
+    # 2a: Gibbs step, draw sigma2 from invgam()
+    shapeSigma2 = alpha+n
+    rateSigma2 = beta + 0.5*(sum((YT - x[3])^2 + (YC - x[4])^2))
+    x[1] = rinvgamma(1, shape=shapeSigma2, rate=rateSigma2)
+    
+    # 2b: Gibbs step, draw nu2 from invgam()
+    shapeNu2 = alpha+1
+    rateNu2 = beta + 0.5*(x[3]^2 + x[4]^2)
+    x[2] = rinvgamma(1, shape=shapeNu2, rate=rateNu2)
+    
+    # 2c: MH step propose muT, muC from N(x[3:4], tau^2 I_2)
+    ## proposal
+    muTprop = rnorm(1, mean=x[3], sd=sqrt(tau2))
+    muCprop = rnorm(1, mean=x[4], sd=sqrt(tau2))
+    
+    ## accept/reject step
+    acceptP = acceptProb(muTprop, muCprop, muT=x[3], muC=x[4], nu2=x[2], sigma2=x[1])
+    accept = runif(1) < acceptP
+    if(accept) {
+      x[3:4] = c(muTprop, muCprop)
+      accepts[i] = TRUE
+    }
+    # otherwise, x[3:4] is already set to the previous state, so we don't 
+    # need to do anything
+    
+    # 2d: store our sample. Note the index of xmat starts at 1 not 0, so 
+    # xmat[i+1,] is the i-th sample
+    xmat[i+1,] = x
+  }
+  
+  acceptRate=mean(accepts)
+  
+  # print total time take and acceptance rate
+  currTime = proc.time()[3]
+  print(paste0("Total time taken: ", round((currTime - startTime)/60, digits=2), " minutes"))
+  print(paste0("Acceptance rate: ", round(acceptRate, digits=4)))
+  list(sampleMat = xmat[(burnin+1):(M+1),], acceptRate=acceptRate)
+}
+```
+
+We assume $\tau^2 = .1$ to start, and eventually decrease it to $\tau^2 = 0.0025$ so the acceptance probability is between $20\%$ and $50\%$ (it is approximately 25$\%$.) Now we run the MCMC sampler:
+```{r}
+set.seed(123)
+
+# run MH and collect results
+results = MH(M=100000, burnin=10000, printEvery=10000, tau2 = .0025)
+samples = results$sampleMat
+acceptRate = results$acceptRate
+```
+
+Plot the results:
+```{r}
+# generate traceplots
+plot(samples[,1], ylab="sigma2", type="l", col="blue", xlab="Iteration", main="Traceplot")
+plot(samples[,2], ylab="nu2", type="l", col="blue", xlab="Iteration", main="Traceplot")
+plot(samples[,3], ylab="muT", type="l", col="blue", xlab="Iteration", main="Traceplot")
+plot(samples[,4], ylab="muC", type="l", col="blue", xlab="Iteration", main="Traceplot")
+
+# generate histogram of marginals
+hist(samples[,1], xlab="sigma2", freq=F)
+abline(v=sigma2, col="green")
+abline(v=mean(samples[,1]), col="purple")
+abline(v=quantile(samples[,1], prob=c(0.025, .975)), col="purple", lty=2)
+hist(samples[,2], xlab="nu2", freq=F)
+abline(v=nu2, col="green")
+abline(v=mean(samples[,2]), col="purple")
+abline(v=quantile(samples[,2], prob=c(0.025, .975)), col="purple", lty=2)
+hist(samples[,3], xlab="muT", freq=F)
+abline(v=muT, col="green")
+abline(v=mean(samples[,3]), col="purple")
+abline(v=quantile(samples[,3], prob=c(0.025, .975)), col="purple", lty=2)
+hist(samples[,4], xlab="muC", freq=F)
+abline(v=muC, col="green")
+abline(v=mean(samples[,4]), col="purple")
+abline(v=quantile(samples[,4], prob=c(0.025, .975)), col="purple", lty=2)
+```
+
+Compare estimates to the truth:
+```{r}
+
+print(paste0("sigma2 Est: ", mean(samples[,1])))
+print(paste0("sigma2: ", sigma2))
+
+print(paste0("nu2 Est: ", mean(samples[,2])))
+print(paste0("nu2: ", nu2))
+
+print(paste0("muT Est: ", mean(samples[,3])))
+print(paste0("muT: ", muT))
+
+print(paste0("muC Est: ", mean(samples[,4])))
+print(paste0("muC: ", muC))
+```
+
+Our estimates are pretty good! The worst estimate is $\nu^2$, which makes sense, because there are only two latent effects directly depending on the variance $\nu^2$.
+
+```{r}
+diffSamples = samples[,3] - samples[,4]
+quants = quantile(diffSamples, prob=c(.025, .975))
+print(paste0("95% CI for muT - muC: (", quants[1], ", ", quants[2], ")"))
+```
+Based on the data and our prior beliefs, we conclude that the treatment is very likely to improve patient outcomes. Here is our posterior for the distribution of the improvement in patient outcomes relative to the placebo along with a 95% credible interval:
+```{r}
+diffSamples = samples[,3] - samples[,4]
+quants = quantile(diffSamples, prob=c(.025, .975))
+hist(diffSamples, freq=FALSE, col="skyblue", xlab="muT - muC posterior", main="Posterior of muT - muC", breaks=30)
+abline(v=mean(diffSamples), col="purple")
+abline(v=quants, lty=2, col="purple")
+```

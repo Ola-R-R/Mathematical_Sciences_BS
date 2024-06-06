@@ -1,0 +1,5 @@
+"0","# Correlation Table"
+"0","rf.mod.Best.F <- ranef(mod.Best.F)"
+"0","cortable <- cbind(rf.mod.Best.F$cond$ATTACK,rf.mod.Best.F$cond$DEFENCE)"
+"0","colnames(cortable) <- c(""Attack Type 1"",""Attack Type 2"",""Attack Type 3"", ""Defence Type 1"",""Defence Type 2"",""Defence Type 3"")"
+"0","plot(cortable, col = league_pal(""nba""), cex = 1.5, cex.axis = .8, pch = 19)"
